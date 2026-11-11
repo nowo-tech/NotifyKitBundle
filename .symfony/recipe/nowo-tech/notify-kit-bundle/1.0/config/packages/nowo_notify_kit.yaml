@@ -1,0 +1,4 @@
+# Notify Kit Bundle: see https://github.com/nowo-tech/NotifyKitBundle/blob/main/docs/CONFIGURATION.md
+# Nothing is registered while `enabled` is false.
+nowo_notify_kit:
+    enabled: false
