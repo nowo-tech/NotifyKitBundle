@@ -1,0 +1,5 @@
+Nowo Notify Kit Bundle installed (disabled: `nowo_notify_kit.enabled: false`).
+
+The package is being built slice by slice; see docs/ROADMAP.md for what is available in your version.
+
+Docs: https://github.com/nowo-tech/NotifyKitBundle/tree/main/docs
