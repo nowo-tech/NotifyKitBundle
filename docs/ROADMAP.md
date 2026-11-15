@@ -46,7 +46,7 @@ Every owner question of the contract is answered with its recommendation:
 
 ## Beacon answers
 
-Beacon accepted every recommendation of contract §15:
+Beacon accepted every recommendation of contract §15 (recorded 2026-11-15):
 
 | # | Answer |
 | --- | --- |
@@ -59,6 +59,11 @@ Beacon accepted every recommendation of contract §15:
 
 ## S1 notes (contract deviations)
 
+**Owner decisions 2026-11-15:** the three deviations below on writes inside a host transaction, coalescing without
+`FOR UPDATE` and the `nowo_notify_dedupe` table are **accepted**; a type without a permission written with a context is
+**refused** (deny by default); `notify()` **propagates** `TransientStorageFailure`, and a retry happens only when the host
+sets `doctrine.transaction_runner` to a retrying adapter.
+
 | Contract | S1 | Why |
 | --- | --- | --- |
 | §5.3: a request inside a host transaction is held and processed on the outermost commit | The rows are written **inside** the host transaction (they commit or roll back with it); only the events wait for the outermost commit | A DBAL driver middleware sees the commit while the wrapper connection is still at level 1, so no write can run there; joining keeps "nothing announced, nothing written on rollback" |
@@ -66,4 +71,5 @@ Beacon accepted every recommendation of contract §15:
 | §4.1 `dedupeKey` (no table in §5.1) | New table `<prefix>notify_dedupe` (`sha256` of the key, `expires_at`), claimed with `INSERT IGNORE` / `ON CONFLICT DO NOTHING` | Transactional with the write; no gap lock; the key itself is never stored |
 | §4.2 `InboxInterface` | S1 ships `forgetContext()` only; unread count, pages and row operations come with the visibility re-check in S2 | No read API without read-time visibility |
 | §6.1 write-time access (listed under S2 in §13) | In S1, with `PersonalOnlyAccessChecker` as the default | A 0.1.0 must not write context rows without the access check |
-| §3 / §6.1 a type without permission and a context | Refused (deny by default) | The contract leaves the case open; Beacon gives every project type a permission |
+| §3 / §6.1 a type without permission and a context | Refused (deny by default; owner 2026-11-15) | The contract leaves the case open; Beacon gives every project type a permission |
+| §4.2 failures of `notify()` | `TransientStorageFailure` propagates (503 + Retry-After at the edge); retry only through `doctrine.transaction_runner` (owner 2026-11-15) | No silent loss of a notification; no hidden retries of a committed producer request |
