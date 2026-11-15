@@ -1,3 +1,9 @@
 # de: translation domain NowoNotifyKitBundle (REQ-I18N-002: same keys in en, es, it, fr, pt, de, nl).
 bundle:
     name: "Benachrichtigungen"
+notify:
+    type:
+        generic:
+            title: "Benachrichtigung"
+    category:
+        general: "Allgemein"

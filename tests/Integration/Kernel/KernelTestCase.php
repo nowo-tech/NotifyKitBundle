@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Nowo\NotifyKitBundle\Tests\Integration\Kernel;
 
+use Closure;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\Filesystem\Filesystem;
 
 use function count;
@@ -29,14 +31,23 @@ abstract class KernelTestCase extends TestCase
 
     /**
      * @param array<string, mixed> $config `nowo_notify_kit` configuration
+     * @param (Closure(ContainerConfigurator, string): void)|null $configure
      */
-    protected function bootKernel(array $config = [], ?string $databaseUrl = null): TestKernel
+    protected function bootKernel(array $config = [], ?string $databaseUrl = null, ?Closure $configure = null, bool $notifyRoute = false): TestKernel
     {
-        $id              = (string) preg_replace('/\W+/', '_', static::class . '_' . $this->name() . '_' . count($this->kernels));
-        $kernel          = new TestKernel($id, $config, $databaseUrl);
+        $id              = $this->kernelId(count($this->kernels));
+        $kernel          = new TestKernel($id, $config, $databaseUrl, $configure, $notifyRoute);
         $this->kernels[] = $kernel;
         $kernel->boot();
 
         return $kernel;
+    }
+
+    /**
+     * The cache id of the n-th kernel of this test.
+     */
+    protected function kernelId(int $index): string
+    {
+        return (string) preg_replace('/\W+/', '_', static::class . '_' . $this->name() . '_' . $index);
     }
 }

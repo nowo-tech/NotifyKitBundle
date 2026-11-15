@@ -149,6 +149,7 @@ final class ConfigNodes
                 ->end()
                 ->booleanNode('auto_mapping')->defaultTrue()->info('false = DDD host: register the XML mapping on your own entity manager')->end()
                 ->enumNode('mapping')->values(['xml', 'attribute'])->defaultValue('xml')->info('xml (plain domain class, default) or attribute (twin record class, same schema)')->end()
+                ->append(self::service('transaction_runner', 'nowo-tech/transaction-contract runner of the bundle writes, on the bundle connection, flushing no EntityManager (e.g. a retrying adapter); null = one attempt per write (nowo-tech/transaction-doctrine)'))
             ->end();
 
         return $node;

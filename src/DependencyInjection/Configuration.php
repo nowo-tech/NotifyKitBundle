@@ -263,12 +263,15 @@ final class Configuration implements ConfigurationInterface
                     /**
                      * Deny by default (Q-O6): a type that names a permission needs an access checker.
                      *
-                     * @param array{access: array{checker: string|null}, types: array<string, array{permission: string|null}>} $config
+                     * @param array{access: array{checker: string|null, default_permission: string|null}, types: array<string, array{permission: string|null}>} $config
                      *
-                     * @return array{access: array{checker: string|null}, types: array<string, array{permission: string|null}>}
+                     * @return array{access: array{checker: string|null, default_permission: string|null}, types: array<string, array{permission: string|null}>}
                      */
                     static function (array $config): array {
                         if ($config['access']['checker'] === null) {
+                            if ($config['access']['default_permission'] !== null) {
+                                throw new InvalidConfigurationException('"nowo_notify_kit.access.default_permission" needs "nowo_notify_kit.access.checker" (deny by default: the bundle never guesses who may open a target).');
+                            }
                             foreach ($config['types'] as $key => $type) {
                                 if ($type['permission'] !== null) {
                                     throw new InvalidConfigurationException(sprintf('"nowo_notify_kit.types.%s.permission" needs "nowo_notify_kit.access.checker" (deny by default: the bundle never guesses who may open a target).', $key));

@@ -9,8 +9,11 @@
 
 ## Status
 
-S0 scaffold: no runtime code, no route, no table. Nothing is reachable whatever the configuration. The configuration
-already refuses a type that names a permission without an access checker (deny by default, Q-O6).
+S1 (core inbox): no route yet. `notify()` writes rows only for recipients who may open the target (a context row needs
+the type's permission granted by the host's access checker; the default checker grants nothing), refuses non-local URLs
+and caps params; every query by recipient is re-checked with `===` in PHP on binary-collated columns. Nothing renders
+notification content yet (titles and the bell arrive with S2). The configuration refuses a type or a default permission
+without an access checker (deny by default, Q-O6).
 
 ## Threat model
 
@@ -24,7 +27,7 @@ From contract §6. Each threat names the control that answers it and the slice t
 | XSS through params or titles | Titles rendered from translation keys at display time with autoescape; mail templates autoescaped; Slack mrkdwn escaper; push plain text | S2, S4 |
 | CSRF on read / unread / preferences | FormKit forms and the `X-CSRF-TOKEN` header for `fetch` | S2, S3 |
 | Realtime leak | Private Mercure updates on an HMAC topic per recipient; payload `{event, unread}` only | S2 |
-| Floods | Per-recipient-per-channel limit (overflow to the digest), recipients per request cap, UI write limit, bounded poll | S4 |
+| Floods | Recipients per request cap (S1); per-recipient-per-channel limit (overflow to the digest), UI write limit, bounded poll (S2, S4) | S1, S4 |
 | Personal data in events or logs | Events carry ids only, never params, URLs or rendered text | S1 |
 | Collation (audit LQ) | Recipient ids in `utf8mb4_bin`, PHP `===` re-check on list, count, export and erasure | S1 |
 | Worker-mode bleed | Per-request state in a holder cleared at the request boundary (and `ResetInterface`); N-request test with two recipients | S1, S2 |

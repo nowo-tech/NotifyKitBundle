@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Nowo\NotifyKitBundle\Domain\DedupeMarker: dedupe keys of NotificationRequest::$dedupeKey (sha256, 24 hours). Prefix
+  and binary collation as for Notification.orm.xml.
+-->
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\NotifyKitBundle\Domain\DedupeMarker" table="notify_dedupe" read-only="true">
+        <indexes>
+            <index name="idx_notify_dedupe_expires" columns="expires_at"/>
+        </indexes>
+
+        <id name="keyHash" type="string" column="key_hash" length="64"/>
+
+        <field name="expiresAt" type="datetime_immutable" column="expires_at"/>
+    </entity>
+</doctrine-mapping>

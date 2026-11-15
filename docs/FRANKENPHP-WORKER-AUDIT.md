@@ -3,10 +3,10 @@
 | Field | Value |
 |-------|-------|
 | Package | `nowo-tech/notify-kit-bundle` (`symfony-bundle`) |
-| Audited revision | S0 scaffold (unreleased, `main`) |
-| Audit date | 2026-11-12 |
-| Method | Manual review of every file under `src/`; PHPStan `ruleset-classic` + `ruleset-worker-strict` + `ruleset-hardening`; Igor (`composer igor`); `WorkerRequestLoopTest` (one kernel, 2,000 requests, two owners alternating, memory drift < 1 MiB) |
-| **Verdict** | ✅ **Viable** — S0 registers no service; the bundle class and extension hold boot-time state only |
+| Audited revision | S1 core inbox (`feat/s1`, first tag 0.1.0) |
+| Audit date | 2026-11-15 |
+| Method | Manual review of every file under `src/`; PHPStan `ruleset-classic` + `ruleset-worker-strict` + `ruleset-hardening`; Igor (`composer igor`); `WorkerRequestLoopTest` (one kernel, no resetter, 2,000 requests of two users alternating: each request notifies one user and reads that user's inbox; memory drift < 1 MiB) |
+| **Verdict** | ✅ **Viable** — every S1 service is stateless except the after-commit queue, which the bundle clears at every boundary itself |
 
 ## Table of contents
 
@@ -26,13 +26,13 @@ resetter between requests.
 
 | Area | Status | Notes |
 |------|--------|-------|
-| Mutable state in shared services | ✅ | No service in S0 |
-| `ResetInterface` / `kernel.reset` | n/a | No memo in S0 |
-| Cross-owner leakage | ✅ | `WorkerRequestLoopTest`: each of 2,000 requests sees only its own owner header |
+| Mutable state in shared services | ✅ | Only `AfterCommitQueue` (events of a transaction that joined a host transaction, keyed by a `WeakMap` of native connections) |
+| `ResetInterface` / `kernel.reset` | ✅ | `AfterCommitQueue::reset()` (tag `kernel.reset`), never relied on alone: `AfterCommitQueueResetListener` clears it on `kernel.finish_request` (main request), `kernel.terminate`, `console.terminate`, `WorkerMessageHandledEvent` and `WorkerMessageFailedEvent`; tested |
+| Cross-user leakage | ✅ | `WorkerRequestLoopTest`: no row of A is ever returned to B, the unread count only grows with the user's own rows, `heldCount()` is 0 at the start of every request |
 | Memory growth | ✅ | < 1 MiB drift after warm-up over 2,000 requests |
 | Static properties / `static` locals | ✅ | None (the bundle's extension instance is the Symfony boot-time cache, `@igor-ignore` with justification) |
-| Superglobals, `putenv`, `ini_set`, `setlocale`, timezone | ✅ | None |
-| Doctrine | n/a | No table in S0; later slices write through DBAL in their own transactions and never keep managed entities |
+| Superglobals, `putenv`, `ini_set`, `setlocale`, timezone | ✅ | None; times are converted to UTC explicitly |
+| Doctrine | ✅ | DBAL only, one transaction per call through a `transaction-contract` runner built per call on the current connection (reconnect-safe); no EntityManager is flushed, cleared or reset; no managed entity is kept (the Doctrine recipient resolver detaches what it loaded) |
 | Resources held open | ✅ | None |
 
 ## Services reviewed
@@ -40,7 +40,15 @@ resetter between requests.
 | Class | State | Verdict |
 |-------|-------|---------|
 | `NowoNotifyKitBundle` | Extension instance cached at boot | ✅ boot-time only |
-| `DependencyInjection\NowoNotifyKitExtension`, `Configuration`, `ConfigNodes` | Container build only | ✅ |
+| `DependencyInjection\*` | Container build only | ✅ |
+| `Application\Notifier`, `Inbox`, `Retention\Retention`, `Default\PersonalOnlyAccessChecker` | `final readonly`, collaborators only | ✅ |
+| `Application\TypeRegistry` | Types and categories merged once when built (configuration + tagged providers), immutable | ✅ boot data, not request data |
+| `Infrastructure\Persistence\DbalNotificationStore`, `NotifyKitTransactions` | `final readonly`; connection resolved per call | ✅ |
+| `Infrastructure\Persistence\AfterCommitQueue` | Held events per native connection | ✅ cleared at every boundary + `kernel.reset` (tested) |
+| `Infrastructure\Persistence\AfterCommitMiddleware` / `AfterCommitConnection` | Wraps the driver; no state of its own | ✅ |
+| `Infrastructure\Doctrine\NotifyKitMetadataListener` | Table prefix only | ✅ |
+| `Infrastructure\Recipient\DoctrineRecipientResolver` | `final readonly`; detaches users it loaded | ✅ |
+| `Infrastructure\Console\*`, `Messenger\PruneNotificationsHandler`, `Schema\SchemaChecker` | Stateless; retention cursor travels in the message | ✅ |
 
 ## Rules for the next slices
 
