@@ -16,7 +16,7 @@ an **immediate** REQ-SEC-004 audit before a tag that contains them; the rest is 
 | Slice | Version | Content | Audit |
 | --- | --- | --- | --- |
 | **S0** scaffold | `main`, no tag | Composer, Docker, Makefile + release-check, CI matrix (SQLite / MySQL / PostgreSQL job), PHPStan + worker rulesets, Igor, Rector, CS, coverage gate, Spec Kit baseline, docs set, `.github`, release / sync workflows, Flex recipe, demo skeleton (FrankenPHP worker, MySQL; Mercure joins in S2), strict config tree `enabled: false`. **Then the owner registers the package on Packagist** | Batched |
-| **S1** core inbox ✅ (PR) | 0.1.0 | Domain + XML / attribute mapping, DBAL stores, `notify()` with the in-app channel, coalescing, after-commit buffer, events, type registry (config + tagged), retention command + message, schema-check; plus write-time access (deny by default), the Doctrine recipient resolver, `forgetContext()`, dedupe keys and the load-readiness pattern (transaction-contract, real-database CI job) | Batched |
+| **S1** core inbox ✅ (0.1.0, 2026-11-15) | 0.1.0 | Domain + XML / attribute mapping, DBAL stores, `notify()` with the in-app channel, coalescing, after-commit buffer, events, type registry (config + tagged), retention command + message, schema-check; plus write-time access (deny by default), the Doctrine recipient resolver, `forgetContext()`, dedupe keys and the load-readiness pattern (transaction-contract, real-database CI job) | Batched |
 | **S2** access + UI | 0.2.0 | `RecipientAccessCheckerInterface`, visibility, row operations, bell (Twig + Stimulus + CSS), inbox page, CSRF, realtime (Mercure + poll), operator page | **Immediate** |
 | **S3** preferences | 0.3.0 | Preference store + matrix, contexts, all / involved, master switch, preferences page, AuditKit bridge | Batched |
 | **S4** channels | 0.4.0 | Async fan-out, delivery idempotency, mail (Mailer + MailKit), push (PwaBundle), Slack (SlackKit), quiet hours, digests, rate limits, scheduler recipe | Batched |
@@ -98,3 +98,13 @@ sets `doctrine.transaction_runner` to a retrying adapter.
 | QL-I6 | S2 | Application-level unit-of-work port instead of importing `Infrastructure\Persistence\NotifyKitTransactions` in Application / Domain |
 | QL-I7 | S2 | Tag the after-commit middleware for the bundle connection only |
 | QL-I8 | S2 / S4 | Batch `contextsGranting()` per permission instead of one call per recipient |
+
+## Planned for 0.2.0 (delta audit QL-D, 2026-11-15)
+
+| ID | Item |
+| --- | --- |
+| QL-D-L1 | Track host-named savepoints (`SAVEPOINT <name>` in `exec()` and `query()`) as markers in the held list: `ROLLBACK TO SAVEPOINT <name>` drops what was held after the marker, `RELEASE` pops it; until then documented as a 0.1.0 known issue |
+| QL-D-L2 | MariaDB 11.4 job in the real-database CI matrix; `ReferenceDdlTest` checks the MariaDB block and `SchemaTest` expects `NotifyKitMetadataListener::collation($platform)` |
+| QL-D-I2 | Document that joined events wait for the next bundle call at level 0 or the boundary (long console batches hold them until `console.terminate`), and that `reset()` drains without checking the level (a host transaction left open at the boundary receives the listeners' writes) |
+| QL-D-I3 | Optionally widen `Guard::reference()` to every `\p{Zs}` except U+0020 and the Hangul fillers (U+3164, U+115F) inside an id |
+| QL-D-I4 | REQ-SEC-006 rule 8: a log line or an INSTALLATION note when MySQL 5.7 falls back to `utf8mb4_bin` |

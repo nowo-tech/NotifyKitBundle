@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-15
+
 ### Added
 
 - **S1 core inbox** (contract 221-B §4–§6, §9; first tag 0.1.0):
@@ -47,3 +49,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   Rector, Igor, CI matrix (PHP 8.2 to 8.5, Symfony 7.4 and 8.1), a SQLite / MySQL / PostgreSQL job, a worker test (one
   kernel kept alive, 2,000 requests) and the FrankenPHP demo smoke test.
 - Docs set, Spec Kit baseline, Flex recipe, demo skeleton (Symfony 8.1, FrankenPHP worker mode, MySQL).
+
+### Known issues
+
+- **QL-D-L1:** savepoints the host names itself (`SAVEPOINT x` / `ROLLBACK TO SAVEPOINT x`, `Connection::createSavepoint('x')`
+  / `rollbackSavepoint('x')`) are not seen by the after-commit middleware, so the event of a `notify()` made inside such
+  a savepoint may still be dispatched after the host rolls that savepoint back. DBAL's own nesting (`beginTransaction()`
+  inside a transaction, `wrapInTransaction()`, Doctrine ORM, Messenger's `doctrine_transaction`) is covered. Fix in 0.2.0.
+- **QL-D-L2:** MariaDB is not in CI yet. The runtime maps the identifier columns with `utf8mb4_nopad_bin` there; the
+  reference DDL in docs/INSTALLATION.md now has a separate MariaDB block (`utf8mb4_0900_bin` exists on MySQL 8 only).
+  The MariaDB CI job lands in 0.2.0.
+- **QL-D-I1:** a host that enables `PDO::MYSQL_ATTR_FOUND_ROWS` (or `CLIENT_FOUND_ROWS`) on the bundle connection makes
+  every MySQL dedupe claim look successful, so a duplicate notice can get through (fails open: no leak). Leave it off on
+  that connection.
+
+[Unreleased]: https://github.com/nowo-tech/NotifyKitBundle/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/nowo-tech/NotifyKitBundle/releases/tag/v0.1.0

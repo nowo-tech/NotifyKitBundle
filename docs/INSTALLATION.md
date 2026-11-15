@@ -80,14 +80,23 @@ DDD hosts set `doctrine.auto_mapping: false` and register the bundle's XML mappi
 ### Reference DDL
 
 Generated from the mapping by `tests/Integration/Database/ReferenceDdlTest.php` (DBAL 4, ORM 3; `NOWO_PRINT_DDL=1`
-prints it), default prefix.
+prints it), default prefix. The MySQL, PostgreSQL and SQLite blocks are checked in CI; the MariaDB block was generated
+from the same mapping with a MariaDB 11.4 platform.
 
-MySQL 8.4 / MariaDB:
+MySQL 8.0.17+ / 8.4:
 
 <!-- ddl:mysql -->
 ```sql
 CREATE TABLE nowo_notify_notification (recipient_type VARCHAR(32) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, recipient_id VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, type VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, category VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, actor_type VARCHAR(32) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`, actor_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`, context_type VARCHAR(32) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`, context_id VARCHAR(64) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`, target VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, url VARCHAR(500) NOT NULL, params JSON NOT NULL, repeats INT NOT NULL, first_created_at DATETIME NOT NULL, created_at DATETIME NOT NULL, read_at DATETIME DEFAULT NULL, id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, INDEX idx_nowo_notify_notification_inbox (recipient_type, recipient_id, read_at, created_at, id), INDEX idx_nowo_notify_notification_repeat (recipient_type, recipient_id, type, target), INDEX idx_nowo_notify_notification_context (context_type, context_id), INDEX idx_nowo_notify_notification_created (created_at), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4;
 CREATE TABLE nowo_notify_dedupe (expires_at DATETIME NOT NULL, key_hash VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, INDEX idx_nowo_notify_dedupe_expires (expires_at), PRIMARY KEY (key_hash)) DEFAULT CHARACTER SET utf8mb4;
+```
+
+MariaDB 10.6+ (`utf8mb4_nopad_bin`; not in CI yet, see the 0.1.0 known issues in [CHANGELOG.md](CHANGELOG.md)):
+
+<!-- ddl:mariadb -->
+```sql
+CREATE TABLE nowo_notify_notification (recipient_type VARCHAR(32) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, recipient_id VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, type VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, category VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, actor_type VARCHAR(32) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_nopad_bin`, actor_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_nopad_bin`, context_type VARCHAR(32) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_nopad_bin`, context_id VARCHAR(64) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_nopad_bin`, target VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, url VARCHAR(500) NOT NULL, params JSON NOT NULL, repeats INT NOT NULL, first_created_at DATETIME NOT NULL, created_at DATETIME NOT NULL, read_at DATETIME DEFAULT NULL, id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, INDEX idx_nowo_notify_notification_inbox (recipient_type, recipient_id, read_at, created_at, id), INDEX idx_nowo_notify_notification_repeat (recipient_type, recipient_id, type, target), INDEX idx_nowo_notify_notification_context (context_type, context_id), INDEX idx_nowo_notify_notification_created (created_at), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4;
+CREATE TABLE nowo_notify_dedupe (expires_at DATETIME NOT NULL, key_hash VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, INDEX idx_nowo_notify_dedupe_expires (expires_at), PRIMARY KEY (key_hash)) DEFAULT CHARACTER SET utf8mb4;
 ```
 
 PostgreSQL 16 / 17:

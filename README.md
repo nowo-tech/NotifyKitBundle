@@ -4,7 +4,7 @@
 
 **Notifications for Symfony: one notify() call, an in-app inbox with a real-time badge, per-person preferences by category and channel, quiet hours and digests, mail / push / Slack channels and GDPR export and erasure.**
 
-> 🚧 **Status: S1 core inbox (first tag 0.1.0).** The package is built slice by slice from its design contract
+> 🚧 **Status: 0.1.0 (S1 core inbox).** The package is built slice by slice from its design contract
 > ([docs/CONTRACT.md](docs/CONTRACT.md), 221-B). S1 ships `notify()` with the in-app rows (coalescing, dedupe, deny
 > by default), the type registry, retention and the schema check; the bell, preferences and channels land with the
 > slices in [docs/ROADMAP.md](docs/ROADMAP.md).
