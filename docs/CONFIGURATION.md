@@ -2,7 +2,7 @@
 
 Root key: `nowo_notify_kit`. The tree is **strict** (REQ-SF-006): unknown keys and invalid values are refused at
 container build, and the message names the path and the allowed values. Every key of contract §7 is accepted from S0;
-the column *Used from* says which slice reads it. **S0 registers nothing**, whatever the values.
+the column *Used from* says which slice reads it. Nothing is registered while `enabled` is false.
 
 ## Table of contents
 
@@ -15,7 +15,7 @@ the column *Used from* says which slice reads it. **S0 registers nothing**, what
 ```yaml
 nowo_notify_kit:
     enabled: false
-    doctrine: { entity_manager: default, table_prefix: 'nowo_', auto_mapping: true, mapping: xml }
+    doctrine: { entity_manager: default, table_prefix: 'nowo_', auto_mapping: true, mapping: xml, transaction_runner: null }
     recipient: { type: user, class: null, id_field: id, resolver: null, directory: null }
     access: { checker: null, default_permission: null }   # the container refuses a type with a permission and no checker (Q-O6)
     types:                                                # merged with tagged TypeProviderInterface services and bridges
@@ -62,12 +62,29 @@ nowo_notify_kit:
 
 | Key | Used from |
 | --- | --- |
-| `enabled`, `doctrine`, `recipient`, `types`, `categories`, `inbox`, `retention`, `messenger` | S1 |
-| `access`, `realtime`, `web_ui`, `admin_ui` | S2 |
+| `enabled`, `doctrine`, `recipient` (`type`, `class`, `id_field`, `resolver`), `access` (write time), `types`, `categories`, `inbox.repeat_window_seconds`, `fan_out.max_recipients`, `retention` (`read_days`, `keep_per_recipient`, `batch_size`), `messenger` | S1 |
+| `recipient.directory`, `access` (read time), `inbox.menu_limit` / `page_size`, `realtime`, `web_ui`, `admin_ui` | S2 |
 | `preferences` | S3 |
-| `channels`, `delivery`, `quiet_hours`, `digest`, `fan_out`, `limits`, `links`, `schedule` | S4 |
+| `channels`, `delivery`, `quiet_hours`, `digest`, `fan_out.chunk`, `limits`, `links`, `schedule`, `retention.delivery_log_days` | S4 |
 | `bridges`, `settings_provider` | S5 |
 | `api` | S6 |
+
+### Keys read in S1
+
+| Key | Effect |
+| --- | --- |
+| `doctrine.entity_manager` | The entity manager (or DBAL connection) whose connection holds the tables; standard hosts get the mapping prepended there |
+| `doctrine.table_prefix` | Prefix of the tables and their index names (default `nowo_`) |
+| `doctrine.auto_mapping` | `false` for DDD hosts that register the XML mapping themselves |
+| `doctrine.mapping` | `xml` (plain domain classes, default) or `attribute` (twin record classes, same schema) |
+| `doctrine.transaction_runner` | A `Nowo\TransactionContract\TransactionRunnerInterface` service for the bundle writes (e.g. a retrying adapter); it must work on the bundle connection and flush no EntityManager. `null` = one attempt per write (`nowo-tech/transaction-doctrine`) |
+| `recipient.class` / `id_field` / `type` | The default Doctrine `RecipientResolverInterface` (none is registered without `class` or `resolver`) |
+| `recipient.resolver` | Your `RecipientResolverInterface` service |
+| `access.checker` / `default_permission` | Your `RecipientAccessCheckerInterface` service; the permission of unknown types with a context |
+| `types` / `categories` | The registry (merged with tagged `TypeProviderInterface` services) |
+| `inbox.repeat_window_seconds` | Coalescing window (0 = never coalesce) |
+| `fan_out.max_recipients` | Most recipients per request |
+| `retention.*`, `messenger.max_seconds` | `nowo:notify-kit:prune` and `PruneNotificationsMessage` |
 
 ## Container parameters
 
@@ -80,7 +97,8 @@ nowo_notify_kit:
 
 ## Validation rules
 
-- Deny by default (Q-O6): a type with a `permission` needs `access.checker`.
+- Deny by default (Q-O6): a type with a `permission`, or `access.default_permission`, needs `access.checker` (types
+  from tagged providers are checked when the registry is built).
 - Type keys: `^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$` (e.g. `issue.assigned`); category keys and `recipient.type`:
   `^[a-z][a-z0-9_]{0,31}$`; a type needs a `category`.
 - `quiet_hours.default_timezone`: a PHP time zone identifier; `digest.default_hour`: 0 to 23.

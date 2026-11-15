@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Nowo\NotifyKitBundle\Tests\Integration\Kernel;
 
+use Closure;
 use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
 use Nowo\NotifyKitBundle\NowoNotifyKitBundle;
-use Nowo\NotifyKitBundle\Tests\Fixtures\EchoController;
+use Nowo\NotifyKitBundle\Tests\Fixtures\NotifyController;
 use Psr\Log\NullLogger;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
@@ -18,8 +19,8 @@ use function dirname;
 use function sys_get_temp_dir;
 
 /**
- * Standard-host kernel of the integration tests: FrameworkBundle, the bundle and, on demand, DoctrineBundle (DBAL
- * only). One route, `/echo`, answers the request's `X-Test-Owner` header and the bundle's API prefix parameter.
+ * Kernel of the integration tests: FrameworkBundle, the bundle and, on demand, DoctrineBundle (DBAL only, or what
+ * `$configure` sets up: ORM, host fixtures). With `$notifyRoute`, `/notify` runs {@see NotifyController}.
  */
 final class TestKernel extends Kernel
 {
@@ -28,11 +29,14 @@ final class TestKernel extends Kernel
     /**
      * @param array<string, mixed> $bundleConfig `nowo_notify_kit` configuration
      * @param string|null $databaseUrl DBAL URL; null = no DoctrineBundle
+     * @param (Closure(ContainerConfigurator, string): void)|null $configure extra host configuration
      */
     public function __construct(
         private readonly string $id,
         private readonly array $bundleConfig = [],
         private readonly ?string $databaseUrl = null,
+        private readonly ?Closure $configure = null,
+        private readonly bool $notifyRoute = false,
     ) {
         parent::__construct('test', false);
     }
@@ -70,26 +74,33 @@ final class TestKernel extends Kernel
     {
         $container->extension('framework', [
             'test'                  => true,
-            'secret'                => 'S0-' . $this->id,
+            'secret'                => 'S1-' . $this->id,
             'http_method_override'  => false,
             'handle_all_throwables' => true,
             'php_errors'            => ['log' => true],
             'router'                => ['utf8' => true],
         ]);
-        if ($this->databaseUrl !== null) {
+        if ($this->databaseUrl !== null && !$this->configure instanceof Closure) {
             $container->extension('doctrine', ['dbal' => ['url' => $this->databaseUrl]]);
+        }
+        if ($this->configure instanceof Closure) {
+            ($this->configure)($container, (string) $this->databaseUrl);
         }
         $container->extension('nowo_notify_kit', $this->bundleConfig);
         $container->services()->set('logger', NullLogger::class);
-        $container->services()
-            ->set(EchoController::class)
-            ->arg('$apiPrefix', '%nowo_notify_kit.api_prefix%')
-            ->public()
-            ->tag('controller.service_arguments');
+        if ($this->notifyRoute) {
+            $container->services()
+                ->set(NotifyController::class)
+                ->autowire()
+                ->public()
+                ->tag('controller.service_arguments');
+        }
     }
 
     protected function configureRoutes(RoutingConfigurator $routes): void
     {
-        $routes->add('echo', '/echo')->controller(EchoController::class)->methods(['GET']);
+        if ($this->notifyRoute) {
+            $routes->add('notify', '/notify')->controller(NotifyController::class)->methods(['GET']);
+        }
     }
 }

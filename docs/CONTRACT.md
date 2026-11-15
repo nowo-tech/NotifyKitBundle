@@ -1,5 +1,7 @@
 > **Owner decision 2026-11-12:** extraction approved; every Q-O question below is answered with its
-> recommendation. The Q-B questions (Beacon) stay open: see [ROADMAP.md](ROADMAP.md#open-questions-for-beacon).
+> recommendation. Beacon accepted every Q-B recommendation too (recorded 2026-11-15), and on 2026-11-15 the owner
+> accepted the S1 deviations: see [ROADMAP.md](ROADMAP.md#beacon-answers), which also
+> lists where S1 departs from this text ([S1 notes](ROADMAP.md#s1-notes-contract-deviations)).
 > This copy is the design contract of the bundle; the code follows it slice by slice (S0 = scaffold only).
 
 # Contract 221-B: in-app notification inbox and per-user preferences (NotifyKitBundle). Contract v0.1 for symfony-beacon and the matrix apps

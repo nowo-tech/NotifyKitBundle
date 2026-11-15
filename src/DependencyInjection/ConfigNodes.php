@@ -45,7 +45,7 @@ final class ConfigNodes
         $node = new ScalarNodeDefinition($name);
         $node->defaultValue($default)
             ->validate()
-                ->ifTrue(static fn (mixed $value): bool => !is_string($value) || preg_match('#^(/[A-Za-z0-9._~-]+)+$#', $value) !== 1)
+                ->ifTrue(static fn (mixed $value): bool => !is_string($value) || preg_match('#^(/[A-Za-z0-9._~-]+)+$#D', $value) !== 1)
                 ->thenInvalid('Expected an absolute path without a trailing slash (e.g. "/api"), got %s.')
             ->end();
 
@@ -78,7 +78,7 @@ final class ConfigNodes
                 ->integerNode('limit')->defaultValue($limit)->min(1)->end()
                 ->scalarNode('interval')->defaultValue($interval)
                     ->validate()
-                        ->ifTrue(static fn (mixed $value): bool => !is_string($value) || preg_match('/^[1-9]\d{0,5} (second|minute|hour|day)s?$/', $value) !== 1)
+                        ->ifTrue(static fn (mixed $value): bool => !is_string($value) || preg_match('/^[1-9]\d{0,5} (second|minute|hour|day)s?$/D', $value) !== 1)
                         ->thenInvalid('Expected an interval such as "1 minute" or "15 minutes" (second, minute, hour, day), got %s.')
                     ->end()
                 ->end()
@@ -95,7 +95,7 @@ final class ConfigNodes
         $node = new ScalarNodeDefinition($name);
         $node->defaultValue($default)
             ->validate()
-                ->ifTrue(static fn (mixed $value): bool => !is_string($value) || preg_match('#^[0-9*/,-]+( [0-9*/,-]+){4}$#', $value) !== 1)
+                ->ifTrue(static fn (mixed $value): bool => !is_string($value) || preg_match('#^[0-9*/,-]+( [0-9*/,-]+){4}$#D', $value) !== 1)
                 ->thenInvalid('Expected a five-field cron expression such as "20 3 * * *", got %s.')
             ->end();
 
@@ -125,7 +125,7 @@ final class ConfigNodes
         $node = new ScalarNodeDefinition($name);
         $node->defaultNull()
             ->validate()
-                ->ifTrue(static fn (mixed $value): bool => $value !== null && (!is_string($value) || preg_match('#^https?://[^\s/?\#]+(/[^\s?\#]*[^\s/?\#])?$#', $value) !== 1))
+                ->ifTrue(static fn (mixed $value): bool => $value !== null && (!is_string($value) || preg_match('#^https?://[^\s/?\#]+(/[^\s?\#]*[^\s/?\#])?$#D', $value) !== 1))
                 ->thenInvalid('Expected null or an absolute http(s) URL without a trailing slash, got %s.')
             ->end();
 
@@ -143,12 +143,13 @@ final class ConfigNodes
                 ->scalarNode('entity_manager')->defaultValue('default')->cannotBeEmpty()->end()
                 ->scalarNode('table_prefix')->defaultValue('nowo_')
                     ->validate()
-                        ->ifTrue(static fn (mixed $value): bool => !is_string($value) || preg_match('/^([a-z][a-z0-9_]{0,15})?$/', $value) !== 1)
+                        ->ifTrue(static fn (mixed $value): bool => !is_string($value) || preg_match('/^([a-z][a-z0-9_]{0,15})?$/D', $value) !== 1)
                         ->thenInvalid('Expected a table prefix of lower-case letters, digits and "_" (at most 16, may be empty), got %s.')
                     ->end()
                 ->end()
                 ->booleanNode('auto_mapping')->defaultTrue()->info('false = DDD host: register the XML mapping on your own entity manager')->end()
                 ->enumNode('mapping')->values(['xml', 'attribute'])->defaultValue('xml')->info('xml (plain domain class, default) or attribute (twin record class, same schema)')->end()
+                ->append(self::service('transaction_runner', 'nowo-tech/transaction-contract runner of the bundle writes, on the bundle connection, flushing no EntityManager (e.g. a retrying adapter); null = one attempt per write (nowo-tech/transaction-doctrine)'))
             ->end();
 
         return $node;

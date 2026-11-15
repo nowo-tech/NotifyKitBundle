@@ -4,12 +4,19 @@ declare(strict_types=1);
 
 namespace Nowo\NotifyKitBundle\Tests\Integration\Kernel;
 
+use LogicException;
+use Nowo\NotifyKitBundle\Contract\InboxInterface;
+use Nowo\NotifyKitBundle\Contract\NotifierInterface;
+use Nowo\NotifyKitBundle\Contract\RecipientAccessCheckerInterface;
+use Nowo\NotifyKitBundle\Contract\RecipientResolverInterface;
+use Nowo\NotifyKitBundle\Contract\TypeRegistryInterface;
 use Symfony\Component\DependencyInjection\Container;
 
 use function str_starts_with;
 
 /**
- * Standard Symfony host: the bundle boots with zero configuration and registers nothing in S0.
+ * Standard Symfony host: the bundle boots with zero configuration and registers nothing while disabled; enabled, it
+ * needs DoctrineBundle and exposes its public ports.
  */
 final class KernelBootTest extends KernelTestCase
 {
@@ -23,13 +30,25 @@ final class KernelBootTest extends KernelTestCase
         self::assertSame([], $this->bundleServiceIds($container));
     }
 
-    public function testEnablingTheBundleInS0StillRegistersNoService(): void
+    public function testEnabledWithoutDoctrineIsRefused(): void
     {
-        $container = $this->bootKernel(['enabled' => true, 'api' => ['prefix' => '/v-api']])->getContainer();
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('DoctrineBundle is not');
+        $this->bootKernel(['enabled' => true]);
+    }
 
-        self::assertTrue($container->getParameter('nowo_notify_kit.enabled'));
+    public function testEnabledExposesThePublicPorts(): void
+    {
+        $container = $this->bootKernel(['enabled' => true, 'api' => ['prefix' => '/v-api']], Host::databaseUrl(), Host::standard()->configure())->getContainer();
+
         self::assertSame('/v-api', $container->getParameter('nowo_notify_kit.api_prefix'));
-        self::assertSame([], $this->bundleServiceIds($container));
+        foreach ([NotifierInterface::class, InboxInterface::class, TypeRegistryInterface::class, RecipientAccessCheckerInterface::class] as $port) {
+            self::assertInstanceOf($port, $container->get($port));
+        }
+        self::assertFalse($container->has(RecipientResolverInterface::class), 'no resolver without recipient.class or recipient.resolver');
+        $types = $container->get(TypeRegistryInterface::class);
+        self::assertInstanceOf(TypeRegistryInterface::class, $types);
+        self::assertSame(['in_app'], $types->channels());
     }
 
     /**

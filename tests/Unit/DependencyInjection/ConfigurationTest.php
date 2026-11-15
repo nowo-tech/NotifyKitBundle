@@ -17,7 +17,7 @@ final class ConfigurationTest extends TestCase
         $config = $this->process([]);
 
         self::assertFalse($config['enabled']);
-        self::assertSame(['entity_manager' => 'default', 'table_prefix' => 'nowo_', 'auto_mapping' => true, 'mapping' => 'xml'], $config['doctrine']);
+        self::assertSame(['entity_manager' => 'default', 'table_prefix' => 'nowo_', 'auto_mapping' => true, 'mapping' => 'xml', 'transaction_runner' => null], $config['doctrine']);
         self::assertSame(['type' => 'user', 'class' => null, 'id_field' => 'id', 'resolver' => null, 'directory' => null], $config['recipient']);
         self::assertSame(['checker' => null, 'default_permission' => null], $config['access']);
         self::assertSame([], $config['types']);
@@ -111,8 +111,10 @@ final class ConfigurationTest extends TestCase
         yield 'recipient type' => [['recipient' => ['type' => 'User']], 'nowo_notify_kit.recipient.type'];
         yield 'empty service id' => [['recipient' => ['directory' => '']], 'Expected a service id or null'];
         yield 'type key' => [['types' => ['Issue.Assigned' => ['category' => 'issues']]], 'Every type key must match'];
+        yield 'type key with a trailing newline' => [['types' => ["issue.assigned\n" => ['category' => 'issues']]], 'Every type key must match'];
         yield 'type without category' => [['types' => ['issue.assigned' => []]], 'The child config "category" under "nowo_notify_kit.types.issue.assigned" must be configured'];
         yield 'permission without checker' => [['types' => ['issue.assigned' => ['category' => 'issues', 'permission' => 'issue.view']]], 'needs "nowo_notify_kit.access.checker"'];
+        yield 'default permission without checker' => [['access' => ['default_permission' => 'project.view']], '"nowo_notify_kit.access.default_permission" needs "nowo_notify_kit.access.checker"'];
         yield 'category key' => [['categories' => ['Account' => ['label' => 'Account']]], 'Every category key must match'];
         yield 'tri-state' => [['channels' => ['slack' => ['enabled' => 'sometimes']]], 'Expected true, false or "auto"'];
         yield 'urgency' => [['types' => ['issue.assigned' => ['category' => 'issues', 'urgency' => 'urgent']]], 'nowo_notify_kit.types.issue.assigned.urgency'];

@@ -4,22 +4,27 @@
 
 **Notifications for Symfony: one notify() call, an in-app inbox with a real-time badge, per-person preferences by category and channel, quiet hours and digests, mail / push / Slack channels and GDPR export and erasure.**
 
-> 🚧 **Status: S0 scaffold, no release yet.** The package is built slice by slice from its design contract
-> ([docs/CONTRACT.md](docs/CONTRACT.md), 221-B). S0 ships the bundle class, the strict configuration tree and every
-> quality gate; the features below land with the slices in [docs/ROADMAP.md](docs/ROADMAP.md).
+> 🚧 **Status: 0.1.0 (S1 core inbox).** The package is built slice by slice from its design contract
+> ([docs/CONTRACT.md](docs/CONTRACT.md), 221-B). S1 ships `notify()` with the in-app rows (coalescing, dedupe, deny
+> by default), the type registry, retention and the schema check; the bell, preferences and channels land with the
+> slices in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 > 📋 **Compatible with Symfony 7.4, 8.0 and 8.1** · PHP 8.2+ (Symfony 8.x requires PHP 8.4+)
 
 ![FrankenPHP Friendly Worker Mode](docs/images/frankenphp-friendly.png)
 
 This bundle is built for **FrankenPHP worker mode with the kernel kept alive and not reset between requests**: no
-request state in services, a worker test (one kernel, 2,000 requests) from the first slice.
+request state in services (the one per-transaction buffer is cleared by the bundle at every boundary), a worker test
+(one kernel, 2,000 requests of two users) in CI.
 
 **Standard Symfony by default, DDD / hexagonal opt-in:** zero configuration in a standard project; public ports are
 interfaces and value objects, bundle-owned tables are mapped in XML and referenced by id, the bundle never flushes your
 EntityManager.
 
-## Features (planned, see the roadmap)
+## Features
+
+Available in S1: the entry point, the in-app rows (coalescing, dedupe, write-time access), the type registry,
+retention, the schema check, transaction-safe writes (503-ready transient failures). Planned (see the roadmap): the rest.
 
 - **One entry point**, `NotifierInterface::notify()`: type, recipients (by id), actor, context, target, local URL,
   params, urgency, *involved* people; validated, written after your commit, fanned out per recipient and channel.
