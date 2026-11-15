@@ -22,10 +22,10 @@ use function strlen;
 final class Guard
 {
     /** Recipient, context, category and channel keys. */
-    public const KEY_PATTERN = '/^[a-z][a-z0-9_]{0,31}$/';
+    public const KEY_PATTERN = '/^[a-z][a-z0-9_]{0,31}$/D';
 
     /** Notification type keys, e.g. `invitation_accepted` or `issue.assigned` (at most 64 characters). */
-    public const TYPE_PATTERN = '/^(?=.{1,64}$)[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/';
+    public const TYPE_PATTERN = '/^(?=.{1,64}$)[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/D';
 
     /** Longest local URL path. */
     public const MAX_URL_LENGTH = 500;
@@ -61,6 +61,21 @@ final class Guard
     {
         if ($value === '' || !mb_check_encoding($value, 'UTF-8') || mb_strlen($value, 'UTF-8') > $max || preg_match('/[\x00-\x1F\x7F]/', $value) === 1) {
             throw new InvalidNotificationArgumentException(sprintf('%s must be 1 to %d UTF-8 characters without control characters.', $field, $max));
+        }
+
+        return $value;
+    }
+
+    /**
+     * An identifier that references a person or a context (REQ-SEC-006 rule 1, audit QL-L2): {@see self::identifier()}
+     * plus no white space or separator at either edge, and no invisible character anywhere (format characters such as
+     * ZWSP, BOM and bidi marks, C1 controls, NBSP, line and paragraph separators). Refused, never trimmed.
+     */
+    public static function reference(string $field, string $value, int $max): string
+    {
+        self::identifier($field, $value, $max);
+        if (preg_match('/^[\s\p{Z}]|[\s\p{Z}]$|[\p{Cc}\p{Cf}\x{00A0}\x{2028}\x{2029}]/uD', $value) === 1) {
+            throw new InvalidNotificationArgumentException(sprintf('%s must not start or end with white space or hold invisible characters.', $field));
         }
 
         return $value;

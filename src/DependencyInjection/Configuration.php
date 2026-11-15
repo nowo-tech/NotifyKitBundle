@@ -20,10 +20,10 @@ use function sprintf;
 final class Configuration implements ConfigurationInterface
 {
     /** Notification type keys, e.g. `invitation_accepted` or `issue.assigned`. */
-    public const TYPE_PATTERN = '/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/';
+    public const TYPE_PATTERN = '/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/D';
 
     /** Category, channel and recipient-type keys. */
-    public const KEY_PATTERN = '/^[a-z][a-z0-9_]{0,31}$/';
+    public const KEY_PATTERN = '/^[a-z][a-z0-9_]{0,31}$/D';
 
     /**
      * The `nowo_notify_kit` tree.

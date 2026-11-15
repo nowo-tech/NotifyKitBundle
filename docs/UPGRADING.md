@@ -12,6 +12,10 @@ First release with runtime code. With `enabled: true`:
 - **Two new tables**: `<prefix>notify_notification` and `<prefix>notify_dedupe` (default prefix `nowo_`). Generate a
   migration (`doctrine:migrations:diff`) and compare it with the reference DDL in
   [INSTALLATION.md](INSTALLATION.md#reference-ddl); then `php bin/console nowo:notify-kit:schema-check`.
+- On MySQL / MariaDB the identifier columns use `utf8mb4_0900_bin` (MySQL 8) or `utf8mb4_nopad_bin` (MariaDB), binary
+  NO PAD; MySQL 5.7 gets `utf8mb4_bin`.
+- Joined events (a `notify()` inside your transaction) run after your commit at the next safe point, at the latest at
+  the request / command / message boundary.
 - **New configuration key** `doctrine.transaction_runner` (default `null`).
 - `access.default_permission` now needs `access.checker`, like a type with a permission (deny by default).
 - `InboxInterface` is bundle-implemented: do not implement it in your application, it gains methods in S2.

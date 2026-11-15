@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Nowo\NotifyKitBundle\Infrastructure\Doctrine;
 
 use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
+use Doctrine\DBAL\Platforms\MariaDBPlatform;
+use Doctrine\DBAL\Platforms\MySQL80Platform;
 use Doctrine\ORM\Event\LoadClassMetadataEventArgs;
 use LogicException;
 use Nowo\NotifyKitBundle\Domain\DedupeMarker;
@@ -19,9 +21,11 @@ use function str_replace;
 
 /**
  * Applies `doctrine.table_prefix` to the bundle tables and their index names (`idx_<prefix>notify_notification_inbox`,
- * REQ-ORM-002) and, on MySQL / MariaDB, a binary collation to every identifier column (audit LQ): `ascii_bin` for the
- * ascii keys and ids, `utf8mb4_bin` for the recipient, actor and context identifiers and the target. PostgreSQL and
- * SQLite compare exactly by default and need nothing.
+ * REQ-ORM-002) and, on MySQL / MariaDB, a binary **NO PAD** collation to every identifier column (audit LQ,
+ * REQ-SEC-006 rule 3, audit QL-M3): `utf8mb4_0900_bin` on MySQL 8, `utf8mb4_nopad_bin` on MariaDB, so `'42'` and `'42 '`
+ * never compare equal. `utf8mb4_bin` (PAD SPACE) is only the fallback of MySQL 5.7, where the PHP `===` re-check and
+ * the refusal of edge white space in the reference value objects keep look-alikes apart. PostgreSQL and SQLite compare
+ * exactly by default and need nothing.
  *
  * Touches only the bundle's mapped classes, on whichever entity manager maps them (standard and DDD hosts).
  */
@@ -41,11 +45,21 @@ final readonly class NotifyKitMetadataListener
         DedupeRecord::class       => self::DEDUPE_TABLE,
     ];
 
-    /** Columns that hold ascii keys, ids or hashes. */
-    public const ASCII_COLUMNS = ['id', 'recipient_type', 'type', 'category', 'actor_type', 'context_type', 'key_hash'];
+    /** Identifier columns: keys, ids, references, the target and the dedupe hash. */
+    public const ID_COLUMNS = ['id', 'recipient_type', 'recipient_id', 'type', 'category', 'actor_type', 'actor_id', 'context_type', 'context_id', 'target', 'key_hash'];
 
-    /** Columns that hold UTF-8 identifiers. */
-    public const UTF8_COLUMNS = ['recipient_id', 'actor_id', 'context_id', 'target'];
+    /**
+     * The binary NO PAD collation of the platform: MariaDB `utf8mb4_nopad_bin`, MySQL 8 `utf8mb4_0900_bin`, else the
+     * MySQL 5.7 fallback `utf8mb4_bin` (PAD SPACE).
+     */
+    public static function collation(AbstractMySQLPlatform $platform): string
+    {
+        return match (true) {
+            $platform instanceof MariaDBPlatform => 'utf8mb4_nopad_bin',
+            $platform instanceof MySQL80Platform => 'utf8mb4_0900_bin',
+            default                              => 'utf8mb4_bin',
+        };
+    }
 
     /**
      * @param string $tablePrefix `doctrine.table_prefix`, may be empty
@@ -83,11 +97,10 @@ final readonly class NotifyKitMetadataListener
         if (!$platform instanceof AbstractMySQLPlatform) {
             return;
         }
+        $collation = self::collation($platform);
         foreach ($metadata->fieldMappings as $field => $mapping) {
-            if (in_array($mapping->columnName, self::ASCII_COLUMNS, true)) {
-                $metadata->fieldMappings[$field]->options = ['charset' => 'ascii', 'collation' => 'ascii_bin'] + ($mapping->options ?? []);
-            } elseif (in_array($mapping->columnName, self::UTF8_COLUMNS, true)) {
-                $metadata->fieldMappings[$field]->options = ['charset' => 'utf8mb4', 'collation' => 'utf8mb4_bin'] + ($mapping->options ?? []);
+            if (in_array($mapping->columnName, self::ID_COLUMNS, true)) {
+                $metadata->fieldMappings[$field]->options = ['charset' => 'utf8mb4', 'collation' => $collation] + ($mapping->options ?? []);
             }
         }
     }

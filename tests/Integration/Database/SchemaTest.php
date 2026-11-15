@@ -53,10 +53,10 @@ final class SchemaTest extends KernelTestCase
         $table = $this->table(['doctrine' => ['table_prefix' => '']], Notification::class);
         self::assertSame('notify_notification', $table->getName());
 
-        foreach (['id'     => 'ascii_bin', 'recipient_type' => 'ascii_bin', 'type' => 'ascii_bin', 'category' => 'ascii_bin', 'actor_type' => 'ascii_bin', 'context_type' => 'ascii_bin',
-            'recipient_id' => 'utf8mb4_bin', 'actor_id' => 'utf8mb4_bin', 'context_id' => 'utf8mb4_bin', 'target' => 'utf8mb4_bin'] as $column => $collation) {
+        // MySQL 8.4 in CI: binary NO PAD, so '42' and '42 ' differ (audit QL-M3).
+        foreach (['id', 'recipient_type', 'recipient_id', 'type', 'category', 'actor_type', 'actor_id', 'context_type', 'context_id', 'target'] as $column) {
             $actual = $table->getColumn($column)->getPlatformOptions()['collation'] ?? null;
-            self::assertSame($this->platformIsMySql ? $collation : null, $actual, $column . ': PostgreSQL and SQLite compare exactly by default');
+            self::assertSame($this->platformIsMySql ? 'utf8mb4_0900_bin' : null, $actual, $column . ': PostgreSQL and SQLite compare exactly by default');
         }
         self::assertNull($table->getColumn('url')->getPlatformOptions()['collation'] ?? null, 'the URL is not an identifier');
     }

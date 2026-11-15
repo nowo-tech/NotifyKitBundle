@@ -6,6 +6,7 @@ namespace Nowo\NotifyKitBundle\Application;
 
 use Nowo\NotifyKitBundle\Contract\ContextRef;
 use Nowo\NotifyKitBundle\Contract\InboxInterface;
+use Nowo\NotifyKitBundle\Domain\BatchResult;
 use Nowo\NotifyKitBundle\Domain\NotificationStoreInterface;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\NotifyKitTransactions;
 
@@ -31,11 +32,13 @@ final readonly class Inbox implements InboxInterface
      */
     public function forgetContext(ContextRef $context): int
     {
-        $total = 0;
+        $total  = 0;
+        $cursor = null;
         do {
-            $deleted = $this->transactions->run(fn (): int => $this->store->forgetContext($context, $this->batchSize));
-            $total += $deleted;
-        } while ($deleted >= $this->batchSize);
+            $batch = $this->transactions->run(fn (): BatchResult => $this->store->forgetContext($context, $cursor, $this->batchSize));
+            $total += $batch->deleted;
+            $cursor = $batch->cursor;
+        } while ($cursor !== null);
 
         return $total;
     }

@@ -26,8 +26,8 @@ resetter between requests.
 
 | Area | Status | Notes |
 |------|--------|-------|
-| Mutable state in shared services | ✅ | Only `AfterCommitQueue` (events of a transaction that joined a host transaction, keyed by a `WeakMap` of native connections) |
-| `ResetInterface` / `kernel.reset` | ✅ | `AfterCommitQueue::reset()` (tag `kernel.reset`), never relied on alone: `AfterCommitQueueResetListener` clears it on `kernel.finish_request` (main request), `kernel.terminate`, `console.terminate`, `WorkerMessageHandledEvent` and `WorkerMessageFailedEvent`; tested |
+| Mutable state in shared services | ✅ | Only `AfterCommitQueue`: events of calls that joined a host transaction, held per native connection (`WeakMap`) and level, then *ready* after the commit until a safe point (audit QL-M1: never run inside the driver commit, so a listener cannot leave the host connection at nesting level 1 across requests) |
+| `ResetInterface` / `kernel.reset` | ✅ | `AfterCommitQueue::reset()` (tag `kernel.reset`), never relied on alone: `AfterCommitQueueResetListener` drains the ready work and drops the held work on `kernel.finish_request` (main request), `kernel.terminate`, `console.terminate`, `WorkerMessageHandledEvent` and `WorkerMessageFailedEvent`; tested |
 | Cross-user leakage | ✅ | `WorkerRequestLoopTest`: no row of A is ever returned to B, the unread count only grows with the user's own rows, `heldCount()` is 0 at the start of every request |
 | Memory growth | ✅ | < 1 MiB drift after warm-up over 2,000 requests |
 | Static properties / `static` locals | ✅ | None (the bundle's extension instance is the Symfony boot-time cache, `@igor-ignore` with justification) |

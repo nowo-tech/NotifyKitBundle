@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Nowo\NotifyKitBundle\Tests\Unit\Infrastructure;
 
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Platforms\MariaDBPlatform;
 use Doctrine\DBAL\Platforms\MySQL80Platform;
+use Doctrine\DBAL\Platforms\MySQL84Platform;
+use Doctrine\DBAL\Platforms\MySQLPlatform;
 use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Event\LoadClassMetadataEventArgs;
@@ -19,8 +22,8 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 /**
- * The metadata listener on a MySQL platform (the CI coverage job runs on SQLite): prefix, index names and binary
- * collations; other classes and platforms untouched.
+ * The metadata listener on a MySQL platform (the CI coverage job runs on SQLite): prefix, index names and binary NO PAD
+ * collations (audit QL-M3); other classes and platforms untouched.
  */
 final class MetadataListenerTest extends TestCase
 {
@@ -31,9 +34,16 @@ final class MetadataListenerTest extends TestCase
 
         self::assertSame('app_notify_notification', $metadata->getTableName());
         self::assertArrayHasKey('idx_app_notify_notification_inbox', $metadata->table['indexes'] ?? []);
-        self::assertSame(['charset' => 'ascii', 'collation' => 'ascii_bin'], $metadata->fieldMappings['id']->options);
-        self::assertSame(['charset' => 'utf8mb4', 'collation' => 'utf8mb4_bin', 'fixed' => false], $metadata->fieldMappings['recipientId']->options);
+        self::assertSame(['charset' => 'utf8mb4', 'collation' => 'utf8mb4_0900_bin'], $metadata->fieldMappings['id']->options);
+        self::assertSame(['charset' => 'utf8mb4', 'collation' => 'utf8mb4_0900_bin', 'fixed' => false], $metadata->fieldMappings['recipientId']->options);
         self::assertNull($metadata->fieldMappings['url']->options);
+    }
+
+    public function testEveryMySqlFamilyGetsItsBinaryCollation(): void
+    {
+        self::assertSame('utf8mb4_0900_bin', NotifyKitMetadataListener::collation(new MySQL84Platform()), 'NO PAD');
+        self::assertSame('utf8mb4_nopad_bin', NotifyKitMetadataListener::collation(new MariaDBPlatform()), 'NO PAD');
+        self::assertSame('utf8mb4_bin', NotifyKitMetadataListener::collation(new MySQLPlatform()), 'MySQL 5.7 fallback (PAD SPACE)');
     }
 
     public function testOtherPlatformsAndClassesAreLeftAlone(): void

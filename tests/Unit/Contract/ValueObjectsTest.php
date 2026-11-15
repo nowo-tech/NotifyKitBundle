@@ -37,7 +37,7 @@ final class ValueObjectsTest extends TestCase
         self::assertFalse($upper->equals(new RecipientRef('user', 'usera')));
         self::assertTrue($upper->equals(new RecipientRef('user', 'UserA')));
         self::assertFalse($upper->equals(new RecipientRef('member', 'UserA')));
-        self::assertSame(' padded ', (new RecipientRef('user', ' padded '))->id, 'never trimmed');
+        self::assertSame('in side', (new RecipientRef('user', 'in side'))->id, 'inner spaces are kept');
         self::assertSame('ñandú', (new RecipientRef('user', 'ñandú'))->id);
         self::assertSame(128, mb_strlen((new RecipientRef('user', str_repeat('é', 128)))->id));
 
@@ -57,6 +57,17 @@ final class ValueObjectsTest extends TestCase
         yield 'long recipient id' => [static fn (): RecipientRef => new RecipientRef('user', str_repeat('a', 129)), 'RecipientRef id'];
         yield 'control character' => [static fn (): RecipientRef => new RecipientRef('user', "a\nb"), 'RecipientRef id'];
         yield 'not UTF-8' => [static fn (): RecipientRef => new RecipientRef('user', "\xff"), 'RecipientRef id'];
+        yield 'trailing space' => [static fn (): RecipientRef => new RecipientRef('user', 'bob '), 'must not start or end with white space'];
+        yield 'leading space' => [static fn (): RecipientRef => new RecipientRef('user', ' bob'), 'must not start or end with white space'];
+        yield 'nbsp' => [static fn (): RecipientRef => new RecipientRef('user', "bo\u{00A0}b"), 'invisible characters'];
+        yield 'zwsp' => [static fn (): RecipientRef => new RecipientRef('user', "bo\u{200B}b"), 'invisible characters'];
+        yield 'bom' => [static fn (): RecipientRef => new RecipientRef('user', "\u{FEFF}bob"), 'invisible characters'];
+        yield 'bidi mark' => [static fn (): RecipientRef => new RecipientRef('user', "bob\u{202E}"), 'invisible characters'];
+        yield 'c1 control' => [static fn (): RecipientRef => new RecipientRef('user', "bo\u{0085}b"), 'invisible characters'];
+        yield 'context edge space' => [static fn (): ContextRef => new ContextRef('project', '42 '), 'must not start or end with white space'];
+        yield 'type newline' => [static fn (): RecipientRef => new RecipientRef("user\n", 'a'), 'RecipientRef type'];
+        yield 'context type newline' => [static fn (): ContextRef => new ContextRef("project\n", '1'), 'ContextRef type'];
+        yield 'request type newline' => [static fn (): NotificationRequest => self::request(['type' => "issue.assigned\n"]), 'NotificationRequest type'];
         yield 'long context id' => [static fn (): ContextRef => new ContextRef('project', str_repeat('1', 65)), 'ContextRef id'];
         yield 'notification id' => [static fn (): NotificationId => new NotificationId('01933B1C-5D2E-7A3B-8C4D-123456789ABC'), 'UUIDv7'];
         yield 'uuid v4' => [static fn (): NotificationId => new NotificationId('8c4d1b2e-5d2e-4a3b-8c4d-123456789abc'), 'UUIDv7'];
@@ -158,6 +169,7 @@ final class ValueObjectsTest extends TestCase
         $result = new NotifyResult();
         self::assertSame([0, 0, 0, 0, false, 0, []], [$result->written, $result->coalesced, $result->skippedActor, $result->skippedAccess, $result->deduplicated, $result->enqueued, $result->notificationIds]);
         self::assertTrue(NotificationId::isValid('01933b1c-5d2e-7a3b-8c4d-123456789abc'));
+        self::assertFalse(NotificationId::isValid("01933b1c-5d2e-7a3b-8c4d-123456789abc\n"), 'anchored with /D (audit QL-L3)');
 
         $id    = new NotificationId('01933b1c-5d2e-7a3b-8c4d-123456789abc');
         $event = new NotificationRecordedEvent($id, new RecipientRef('user', 'a'), 'issue.assigned', null, true);

@@ -7,7 +7,6 @@ namespace Nowo\NotifyKitBundle\Application\Retention;
 use DateTimeImmutable;
 use DateTimeZone;
 use Nowo\NotifyKitBundle\Contract\Message\PruneNotificationsMessage;
-use Nowo\NotifyKitBundle\Contract\RecipientRef;
 use Nowo\NotifyKitBundle\Domain\NotificationStoreInterface;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\NotifyKitTransactions;
 use Psr\Clock\ClockInterface;
@@ -66,17 +65,17 @@ final readonly class Retention
         }
 
         if ($phase === PruneNotificationsMessage::PHASE_TRIM) {
-            $after = $cursor->afterRecipientType !== null && $cursor->afterRecipientId !== null ? new RecipientRef($cursor->afterRecipientType, $cursor->afterRecipientId) : null;
+            $after = $cursor->afterRecipientType !== null && $cursor->afterRecipientId !== null ? [$cursor->afterRecipientType, $cursor->afterRecipientId] : null;
             do {
                 $recipients = $this->store->recipientsOver($this->keepPerRecipient, $after, $this->batchSize);
-                foreach ($recipients as $recipient) {
+                foreach ($recipients as [$type, $id]) {
                     do {
-                        $deleted = $this->transactions->run(fn (): int => $this->store->trimRecipient($recipient, $this->keepPerRecipient, $this->batchSize));
+                        $deleted = $this->transactions->run(fn (): int => $this->store->trimRecipient($type, $id, $this->keepPerRecipient, $this->batchSize));
                         $trimmed += $deleted;
                     } while ($deleted >= $this->batchSize);
-                    $after = $recipient;
+                    $after = [$type, $id];
                     if ($this->outOfTime($deadline)) {
-                        return new RetentionReport($read, $trimmed, 0, new PruneNotificationsMessage(PruneNotificationsMessage::PHASE_TRIM, $recipient->type, $recipient->id));
+                        return new RetentionReport($read, $trimmed, 0, new PruneNotificationsMessage(PruneNotificationsMessage::PHASE_TRIM, $type, $id));
                     }
                 }
             } while (count($recipients) >= $this->batchSize);

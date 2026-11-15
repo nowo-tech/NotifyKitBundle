@@ -66,10 +66,35 @@ sets `doctrine.transaction_runner` to a retrying adapter.
 
 | Contract | S1 | Why |
 | --- | --- | --- |
-| §5.3: a request inside a host transaction is held and processed on the outermost commit | The rows are written **inside** the host transaction (they commit or roll back with it); only the events wait for the outermost commit | A DBAL driver middleware sees the commit while the wrapper connection is still at level 1, so no write can run there; joining keeps "nothing announced, nothing written on rollback" |
+| §5.3: a request inside a host transaction is held and processed on the outermost commit | The rows are written **inside** the host transaction (they commit or roll back with it); only the events wait: dropped on the outermost rollback **or a rollback to a savepoint that contains them**, made ready by the outermost commit and dispatched at the next safe point (the bundle's next unit of work at level 0, or the request / command / message boundary at the latest), never inside the driver commit (audit QL-M1 / QL-M2) | A DBAL driver middleware sees the commit while the wrapper connection is still at level 1, so no write can run there; joining keeps "nothing announced, nothing written on rollback" |
 | §5.3: coalescing with `SELECT … FOR UPDATE` | Plain read of the candidate, then `UPDATE … SET repeats = repeats + 1 WHERE id = ? AND read_at IS NULL` | `FOR UPDATE` on a missing row takes a gap lock on MySQL: two concurrent first notifications deadlocked in the real-database job. The row lock of the update keeps "no lost update" |
-| §4.1 `dedupeKey` (no table in §5.1) | New table `<prefix>notify_dedupe` (`sha256` of the key, `expires_at`), claimed with `INSERT IGNORE` / `ON CONFLICT DO NOTHING` | Transactional with the write; no gap lock; the key itself is never stored |
+| §4.1 `dedupeKey` (no table in §5.1) | New table `<prefix>notify_dedupe` (`sha256` of the key, `expires_at`), claimed in **one upsert**: `INSERT … ON DUPLICATE KEY UPDATE expires_at = IF(expires_at <= ?, ?, expires_at)` on MySQL / MariaDB, `INSERT … ON CONFLICT (key_hash) DO UPDATE … WHERE expires_at <= ?` elsewhere | Transactional with the write; no locking read and no update of a missing key, so no gap lock (audit QL-L1: the first S1 version updated before inserting and deadlocked on MySQL); the key itself is never stored |
 | §4.2 `InboxInterface` | S1 ships `forgetContext()` only; unread count, pages and row operations come with the visibility re-check in S2 | No read API without read-time visibility |
 | §6.1 write-time access (listed under S2 in §13) | In S1, with `PersonalOnlyAccessChecker` as the default | A 0.1.0 must not write context rows without the access check |
 | §3 / §6.1 a type without permission and a context | Refused (deny by default; owner 2026-11-15) | The contract leaves the case open; Beacon gives every project type a permission |
 | §4.2 failures of `notify()` | `TransientStorageFailure` propagates (503 + Retry-After at the edge); retry only through `doctrine.transaction_runner` (owner 2026-11-15) | No silent loss of a notification; no hidden retries of a committed producer request |
+
+## Audit QL (2026-11-15, PR #2) — fixed in S1
+
+| ID | Fix |
+| --- | --- |
+| QL-M1 | Held events become *ready* on the outermost commit and run at a safe point (connection at level 0, or a boundary); listeners may open transactions, flush and call `notify()` |
+| QL-M2 | The DBAL middleware sees `ROLLBACK TO SAVEPOINT` / `RELEASE SAVEPOINT` (`DOCTRINE_<n>`, DBAL 3 `DOCTRINE2_SAVEPOINT_<n>`): events of rolled-back savepoints are dropped |
+| QL-M3 | Binary **NO PAD** collations on every identifier column (`utf8mb4_0900_bin` MySQL 8, `utf8mb4_nopad_bin` MariaDB; `utf8mb4_bin` only as the MySQL 5.7 fallback); byte comparison before LIMIT / OFFSET / GROUP BY on MySQL; `forgetContext()` walks the fetched rows by keyset; retention groups by the stored bytes |
+| QL-L1 | One-statement dedupe claim (above) |
+| QL-L2 | `RecipientRef` / `ContextRef` ids refuse edge white space, NBSP, ZWSP, BOM, bidi marks and other invisible characters (never trimmed). `target` and `dedupeKey` stay permissive (C0 / DEL refused): they are matched as given and never shown |
+| QL-L3 | Every anchored pattern uses `/D` (a trailing newline no longer passes) |
+
+## Deferred to S2 and later (audit QL)
+
+| ID | Slice | Item |
+| --- | --- | --- |
+| QL-L4 | S2 | `DoctrineRecipientResolver::userOf()` uses `Query::HINT_REFRESH`, which overwrites a managed, dirty user: return the managed instance (`UnitOfWork::tryGetById()`) or query without refresh, then detach |
+| QL-I1 | S2 / S4 | Titles with Twig autoescape only (no `\|raw`), bidi isolation (`<bdi>` / `dir=auto`), built-in placeholders (`%actor%`, `%target%`) applied after the params so a param cannot spoof them; strip CR/LF from values in mail subjects and headers; re-check `_redirect` with `isLocalPath()` after decoding |
+| QL-I2 | S5 (docs) | Dedupe keys are global: document a `<type>:<target>:<state>` convention or hash the type into the key |
+| QL-I3 | S3 | Cap `NotificationRequest::$involved` at `fan_out.max_recipients` |
+| QL-I4 | S4 | Retention: deadline check inside the per-recipient trim loop; keyset instead of `OFFSET keep` |
+| QL-I5 | S2 (docs) | A host that commits in `kernel.terminate` after the main `finish_request`: its events run at `kernel.terminate` (drain), document the order |
+| QL-I6 | S2 | Application-level unit-of-work port instead of importing `Infrastructure\Persistence\NotifyKitTransactions` in Application / Domain |
+| QL-I7 | S2 | Tag the after-commit middleware for the bundle connection only |
+| QL-I8 | S2 / S4 | Batch `contextsGranting()` per permission instead of one call per recipient |

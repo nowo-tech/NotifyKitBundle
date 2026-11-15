@@ -68,9 +68,11 @@ php bin/console nowo:notify-kit:schema-check   # exit 0 = the tables match the m
 | `nowo_notify_notification` | The inbox: one row per recipient (coalesced repeats), UUIDv7 ids |
 | `nowo_notify_dedupe` | Dedupe keys of `NotificationRequest::$dedupeKey` (sha256 of the key, 24 hours) |
 
-Identifier columns (ids, recipient / actor / context references, type, category, target) use a binary collation on
-MySQL / MariaDB (`ascii_bin` / `utf8mb4_bin`), so ids compare exactly (`usera` is not `UserA`); PostgreSQL and SQLite
-compare exactly by default. The prefix also applies to the index names.
+Identifier columns (ids, recipient / actor / context references, type, category, target, dedupe hash) use a binary
+**NO PAD** collation on MySQL / MariaDB: `utf8mb4_0900_bin` on MySQL 8, `utf8mb4_nopad_bin` on MariaDB. So ids compare
+exactly: `usera` is not `UserA`, and `42` is not `42 `. On MySQL 5.7 the fallback is `utf8mb4_bin`, which pads
+trailing spaces; the value objects refuse ids with edge white space and every query also compares the bytes, so
+look-alikes still never match. PostgreSQL and SQLite compare exactly by default. The prefix also applies to the index names.
 
 DDD hosts set `doctrine.auto_mapping: false` and register the bundle's XML mapping on their own entity manager (see
 [USAGE.md](USAGE.md#using-it-from-a-ddd--hexagonal-application)).
@@ -84,8 +86,8 @@ MySQL 8.4 / MariaDB:
 
 <!-- ddl:mysql -->
 ```sql
-CREATE TABLE nowo_notify_notification (recipient_type VARCHAR(32) CHARACTER SET ascii NOT NULL COLLATE `ascii_bin`, recipient_id VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_bin`, type VARCHAR(64) CHARACTER SET ascii NOT NULL COLLATE `ascii_bin`, category VARCHAR(64) CHARACTER SET ascii NOT NULL COLLATE `ascii_bin`, actor_type VARCHAR(32) CHARACTER SET ascii DEFAULT NULL COLLATE `ascii_bin`, actor_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_bin`, context_type VARCHAR(32) CHARACTER SET ascii DEFAULT NULL COLLATE `ascii_bin`, context_id VARCHAR(64) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_bin`, target VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_bin`, url VARCHAR(500) NOT NULL, params JSON NOT NULL, repeats INT NOT NULL, first_created_at DATETIME NOT NULL, created_at DATETIME NOT NULL, read_at DATETIME DEFAULT NULL, id VARCHAR(36) CHARACTER SET ascii NOT NULL COLLATE `ascii_bin`, INDEX idx_nowo_notify_notification_inbox (recipient_type, recipient_id, read_at, created_at, id), INDEX idx_nowo_notify_notification_repeat (recipient_type, recipient_id, type, target), INDEX idx_nowo_notify_notification_context (context_type, context_id), INDEX idx_nowo_notify_notification_created (created_at), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4;
-CREATE TABLE nowo_notify_dedupe (expires_at DATETIME NOT NULL, key_hash VARCHAR(64) CHARACTER SET ascii NOT NULL COLLATE `ascii_bin`, INDEX idx_nowo_notify_dedupe_expires (expires_at), PRIMARY KEY (key_hash)) DEFAULT CHARACTER SET utf8mb4;
+CREATE TABLE nowo_notify_notification (recipient_type VARCHAR(32) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, recipient_id VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, type VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, category VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, actor_type VARCHAR(32) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`, actor_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`, context_type VARCHAR(32) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`, context_id VARCHAR(64) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`, target VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, url VARCHAR(500) NOT NULL, params JSON NOT NULL, repeats INT NOT NULL, first_created_at DATETIME NOT NULL, created_at DATETIME NOT NULL, read_at DATETIME DEFAULT NULL, id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, INDEX idx_nowo_notify_notification_inbox (recipient_type, recipient_id, read_at, created_at, id), INDEX idx_nowo_notify_notification_repeat (recipient_type, recipient_id, type, target), INDEX idx_nowo_notify_notification_context (context_type, context_id), INDEX idx_nowo_notify_notification_created (created_at), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4;
+CREATE TABLE nowo_notify_dedupe (expires_at DATETIME NOT NULL, key_hash VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, INDEX idx_nowo_notify_dedupe_expires (expires_at), PRIMARY KEY (key_hash)) DEFAULT CHARACTER SET utf8mb4;
 ```
 
 PostgreSQL 16 / 17:

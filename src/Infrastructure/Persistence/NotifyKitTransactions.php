@@ -27,7 +27,9 @@ use function sprintf;
  * - Outside a transaction: the runner opens and commits one; a deadlock, lock wait timeout or serialization failure
  *   surfaces as {@see TransientStorageFailure} with the connection back at level 0 (answer 503 + Retry-After).
  * - Inside a host transaction on the same connection: the work joins it (nested level; it disappears with a rollback)
- *   and the after-commit work waits for the outermost commit ({@see AfterCommitQueue}); a rollback drops it.
+ *   and the after-commit work waits for the outermost commit ({@see AfterCommitQueue}); a rollback, or a rollback to a
+ *   savepoint that contains it, drops it. After that commit it runs at the next safe point: the next unit of work of
+ *   the bundle on a connection at level 0, or the request / command / message boundary at the latest.
  *
  * Stateless (worker mode): the connection is resolved per call, so a connection the registry replaced is picked up.
  */
@@ -83,19 +85,32 @@ final readonly class NotifyKitTransactions
     public function run(Closure $work, ?Closure $afterCommit = null): mixed
     {
         $connection = $this->connection();
-        $result     = ($this->runner ?? DoctrineTransactionRunner::forConnection($connection))->run($work);
+        $this->drainAtLevelZero($connection);
+        $result = ($this->runner ?? DoctrineTransactionRunner::forConnection($connection))->run($work);
         if ($afterCommit instanceof Closure) {
             $then = static function () use ($afterCommit, $result): void {
                 $afterCommit($result);
             };
             $native = $connection->isTransactionActive() ? $connection->getNativeConnection() : null;
             if (is_object($native)) {
-                $this->afterCommit->hold($native, $then);
+                $this->afterCommit->hold($native, $connection->getTransactionNestingLevel(), $then);
             } else {
+                $this->afterCommit->drain();
                 $this->afterCommit->run($then);
             }
         }
+        $this->drainAtLevelZero($connection);
 
         return $result;
+    }
+
+    /**
+     * A safe point (audit QL-M1): with the connection at level 0, work made ready by an earlier host commit runs now.
+     */
+    private function drainAtLevelZero(Connection $connection): void
+    {
+        if (!$connection->isTransactionActive()) {
+            $this->afterCommit->drain();
+        }
     }
 }

@@ -4,7 +4,7 @@
 **Package**: `nowo-tech/notify-kit-bundle`
 **Last audited**: 2026-11-15 (S1)
 
-Scope: every file under `src/`. Audit command: `find src -type f | wc -l` → **60**.
+Scope: every file under `src/`. Audit command: `find src -type f | wc -l` → **61**.
 
 | Source file | Requirement IDs |
 | --- | --- |
@@ -39,6 +39,7 @@ Scope: every file under `src/`. Audit command: `find src -type f | wc -l` → **
 | `src/DependencyInjection/ConfigNodes.php` | FR-CONFIG-001 |
 | `src/DependencyInjection/Configuration.php` | FR-CONFIG-001 |
 | `src/DependencyInjection/NowoNotifyKitExtension.php` | FR-CONFIG-001, FR-CONFIG-002 |
+| `src/Domain/BatchResult.php` | FR-CTX-001, FR-DB-002 |
 | `src/Domain/DedupeMarker.php` | FR-NOTIFY-001, FR-DB-002 |
 | `src/Domain/Notification.php` | FR-NOTIFY-001, FR-DB-002 |
 | `src/Domain/NotificationStoreInterface.php` | FR-NOTIFY-001, FR-DB-002 |
@@ -69,5 +70,5 @@ Scope: every file under `src/`. Audit command: `find src -type f | wc -l` → **
 | `src/Resources/translations/NowoNotifyKitBundle.nl.yaml` | FR-I18N-001 |
 | `src/Resources/translations/NowoNotifyKitBundle.pt.yaml` | FR-I18N-001 |
 
-| Total production sources | 60 |
+| Total production sources | 61 |
 | --- | --- |

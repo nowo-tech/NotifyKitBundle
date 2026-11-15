@@ -89,15 +89,22 @@ foreign key (Q-B6). From S2 the inbox also hides rows whose context the recipien
   `nowo-tech/transaction-contract` runner: it **never flushes, clears or resets an EntityManager**.
 - **Outside a transaction** each `notify()` is one short transaction (recipients in key order).
 - **Inside your transaction on the same connection** the rows join it: they are committed with it and disappear with a
-  rollback. The events wait for your outermost commit and are dropped on rollback (a notification never announces
-  something that was rolled back). Rows written inside your transaction keep their row locks until your commit.
+  rollback. The events wait: they are dropped on your rollback, or on a rollback to a savepoint that contains the call,
+  so a notification never announces something that was rolled back. After your outermost commit they run at the next
+  safe point: the bundle's next unit of work on a connection at level 0, or the request / command / message boundary
+  **at the latest** (never inside the driver commit, so listeners may open transactions, flush or call `notify()`).
+  Rows written inside your transaction keep their row locks until your commit.
 - A deadlock, lock wait timeout or serialization failure surfaces as `Nowo\TransactionContract\TransientStorageFailure`
   with nothing written: answer **503 with `Retry-After`** (`$e->retryAfterSeconds()`), or retry. To retry inside the
   bundle, set `doctrine.transaction_runner` to a retrying adapter that works on the bundle connection and flushes no
   EntityManager (e.g. the connection-level adapter of `nowo-tech/doctrine-deadlock-retry-bundle` 3.x).
 - Concurrency: coalescing never takes a gap lock (it reads the candidate row, then updates it by primary key with
   `repeats = repeats + 1`), so two concurrent repeats both count and two concurrent first notifications insert two rows
-  at worst, never deadlock. A dedupe key is claimed with `INSERT IGNORE` / `ON CONFLICT DO NOTHING`.
+  at worst, never deadlock. A dedupe key is claimed in one upsert that only takes over an expired key, so no gap lock
+  either.
+- Identifier equality is exact before any `LIMIT`, `OFFSET` or `GROUP BY`: NO PAD binary collations on MySQL / MariaDB
+  plus a byte comparison in every query by recipient or context; `RecipientRef` / `ContextRef` refuse ids with edge white
+  space or invisible characters (never trimmed).
 - Events (after commit, references only, never params, URLs or text):
 
   | Event | Payload |

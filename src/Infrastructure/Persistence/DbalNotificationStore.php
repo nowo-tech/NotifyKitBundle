@@ -13,6 +13,7 @@ use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
 use Nowo\NotifyKitBundle\Contract\ContextRef;
 use Nowo\NotifyKitBundle\Contract\NotificationId;
 use Nowo\NotifyKitBundle\Contract\RecipientRef;
+use Nowo\NotifyKitBundle\Domain\BatchResult;
 use Nowo\NotifyKitBundle\Domain\Notification;
 use Nowo\NotifyKitBundle\Domain\NotificationStoreInterface;
 use Nowo\NotifyKitBundle\Domain\RecordOutcome;
@@ -20,6 +21,7 @@ use Nowo\NotifyKitBundle\Infrastructure\Doctrine\NotifyKitMetadataListener;
 
 use function array_values;
 use function count;
+use function implode;
 use function is_array;
 use function is_numeric;
 use function is_string;
@@ -38,7 +40,10 @@ use const JSON_UNESCAPED_UNICODE;
  * - Writes run inside the transaction of {@see NotifyKitTransactions} and never take a gap lock: coalescing reads the
  *   candidate row, then updates it by primary key with `repeats = repeats + 1` (two concurrent repeats queue on the row
  *   lock and both count; two concurrent first notifications insert two rows at worst, never deadlock); a dedupe key is
- *   claimed with an insert that ignores a held key (`INSERT IGNORE` / `ON CONFLICT DO NOTHING`).
+ *   claimed in one upsert (`ON DUPLICATE KEY UPDATE` / `ON CONFLICT DO UPDATE … WHERE`) that takes over only an expired
+ *   marker.
+ * - Identifier equality is exact before any LIMIT / OFFSET / GROUP BY (byte comparison on MySQL, NO PAD collations
+ *   from the metadata listener); walks that delete in batches follow the rows fetched, not the rows deleted.
  * - Times are stored and read as UTC (`Y-m-d H:i:s`). Every result selected by recipient is re-checked in PHP (`===`,
  *   audit LQ) before it is returned, updated or deleted.
  *
@@ -78,9 +83,10 @@ final readonly class DbalNotificationStore implements NotificationStoreInterface
             // A plain read finds the candidate; the update locks only that row (by primary key, no gap lock) and
             // re-checks it is still unread. Two concurrent first notifications therefore never deadlock (at worst they
             // insert two rows), and two concurrent repeats queue on the row lock and both count.
-            $row = $connection->fetchAssociative(
-                sprintf('SELECT id, recipient_type, recipient_id, type, target FROM %s WHERE recipient_type = ? AND recipient_id = ? AND type = ? AND target = ? AND read_at IS NULL AND created_at >= ? ORDER BY created_at DESC, id DESC LIMIT 1', $this->table),
-                [$recipient->type, $recipient->id, $draft->type(), $draft->target(), $this->utc($repeatSince)],
+            [$where, $values] = $this->exact($connection, ['recipient_type' => $recipient->type, 'recipient_id' => $recipient->id, 'type' => $draft->type(), 'target' => $draft->target()]);
+            $row              = $connection->fetchAssociative(
+                sprintf('SELECT id, recipient_type, recipient_id, type, target FROM %s WHERE %s AND read_at IS NULL AND created_at >= ? ORDER BY created_at DESC, id DESC LIMIT 1', $this->table, $where),
+                [...$values, $this->utc($repeatSince)],
             );
             if (is_array($row) && is_string($row['id']) && $row['recipient_type'] === $recipient->type && $row['recipient_id'] === $recipient->id
                 && $row['type'] === $draft->type() && $row['target'] === $draft->target()
@@ -119,39 +125,48 @@ final readonly class DbalNotificationStore implements NotificationStoreInterface
      */
     public function claimDedupe(string $keyHash, DateTimeImmutable $now, DateTimeImmutable $until): bool
     {
-        // No locking read (a gap lock on a missing key deadlocks two concurrent claims on MySQL): take an expired
-        // marker over, else insert, ignoring a key another request holds (it waits for that request to end).
+        // One statement (audit QL-L1): an insert, or the takeover of an expired marker, never a locking read or an
+        // update of a missing key (a gap lock on MySQL deadlocks two concurrent first claims).
         $connection = $this->transactions->connection();
-        if ((int) $connection->executeStatement(
-            sprintf('UPDATE %s SET expires_at = ? WHERE key_hash = ? AND expires_at <= ?', $this->dedupeTable),
-            [$this->utc($until), $keyHash, $this->utc($now)],
-        ) === 1) {
-            return true;
-        }
-        $mysql  = $connection->getDatabasePlatform() instanceof AbstractMySQLPlatform;
-        $insert = $mysql ? 'INSERT IGNORE INTO %s (key_hash, expires_at) VALUES (?, ?)' : 'INSERT INTO %s (key_hash, expires_at) VALUES (?, ?) ON CONFLICT (key_hash) DO NOTHING';
+        if ($connection->getDatabasePlatform() instanceof AbstractMySQLPlatform) {
+            // Affected rows: 1 = inserted, 2 = expired marker taken over, 0 = a live marker holds the key.
+            $affected = (int) $connection->executeStatement(
+                sprintf('INSERT INTO %s (key_hash, expires_at) VALUES (?, ?) ON DUPLICATE KEY UPDATE expires_at = IF(expires_at <= ?, ?, expires_at)', $this->dedupeTable),
+                [$keyHash, $this->utc($until), $this->utc($now), $this->utc($until)],
+            );
 
-        return (int) $connection->executeStatement(sprintf($insert, $this->dedupeTable), [$keyHash, $this->utc($until)]) === 1;
+            return $affected > 0;
+        }
+
+        return (int) $connection->executeStatement(
+            sprintf('INSERT INTO %1$s (key_hash, expires_at) VALUES (?, ?) ON CONFLICT (key_hash) DO UPDATE SET expires_at = EXCLUDED.expires_at WHERE %1$s.expires_at <= ?', $this->dedupeTable),
+            [$keyHash, $this->utc($until), $this->utc($now)],
+        ) === 1;
     }
 
     /**
      * {@inheritDoc}
      */
-    public function forgetContext(ContextRef $context, int $limit): int
+    public function forgetContext(ContextRef $context, ?string $afterId, int $limit): BatchResult
     {
-        $connection = $this->transactions->connection();
-        $rows       = $connection->fetchAllAssociative(
-            sprintf('SELECT id, context_type, context_id FROM %s WHERE context_type = ? AND context_id = ? ORDER BY id LIMIT %d', $this->table, $limit),
-            [$context->type, $context->id],
-        );
-        $ids = [];
+        // Keyset over the rows fetched (audit QL-M3): a row the PHP re-check refuses never stops the walk.
+        $connection       = $this->transactions->connection();
+        [$where, $values] = $this->exact($connection, ['context_type' => $context->type, 'context_id' => $context->id]);
+        if ($afterId !== null) {
+            $where .= ' AND id > ?';
+            $values[] = $afterId;
+        }
+        $rows = $connection->fetchAllAssociative(sprintf('SELECT id, context_type, context_id FROM %s WHERE %s ORDER BY id LIMIT %d', $this->table, $where, $limit), $values);
+        $ids  = [];
+        $last = null;
         foreach ($rows as $row) {
+            $last = (string) $row['id'];
             if ($row['context_type'] === $context->type && $row['context_id'] === $context->id) {
                 $ids[] = $row['id'];
             }
         }
 
-        return $this->deleteIds($connection, $ids);
+        return new BatchResult($this->deleteIds($connection, $ids), count($rows) >= $limit ? $last : null);
     }
 
     /**
@@ -171,23 +186,26 @@ final readonly class DbalNotificationStore implements NotificationStoreInterface
     /**
      * {@inheritDoc}
      */
-    public function recipientsOver(int $keep, ?RecipientRef $after, int $limit): array
+    public function recipientsOver(int $keep, ?array $after, int $limit): array
     {
-        $where  = '';
-        $params = [];
-        if ($after instanceof RecipientRef) {
-            $where  = ' WHERE recipient_type > ? OR (recipient_type = ? AND recipient_id > ?)';
-            $params = [$after->type, $after->type, $after->id];
+        // Grouped by the exact bytes of the id on MySQL (audit QL-M3): look-alikes never form one group.
+        $connection = $this->transactions->connection();
+        $id         = $connection->getDatabasePlatform() instanceof AbstractMySQLPlatform ? 'CAST(recipient_id AS BINARY)' : 'recipient_id';
+        $where      = '';
+        $params     = [];
+        if ($after !== null) {
+            $where  = sprintf(' WHERE recipient_type > ? OR (recipient_type = ? AND %s > ?)', $id);
+            $params = [$after[0], $after[0], $after[1]];
         }
         $params[] = $keep;
-        $rows     = $this->transactions->connection()->fetchAllAssociative(
-            sprintf('SELECT recipient_type, recipient_id FROM %s%s GROUP BY recipient_type, recipient_id HAVING COUNT(*) > ? ORDER BY recipient_type, recipient_id LIMIT %d', $this->table, $where, $limit),
+        $rows     = $connection->fetchAllAssociative(
+            sprintf('SELECT recipient_type, %1$s AS rid FROM %2$s%3$s GROUP BY recipient_type, %1$s HAVING COUNT(*) > ? ORDER BY recipient_type, %1$s LIMIT %4$d', $id, $this->table, $where, $limit),
             $params,
             [count($params) - 1 => ParameterType::INTEGER],
         );
         $recipients = [];
         foreach ($rows as $row) {
-            $recipients[] = new RecipientRef((string) $row['recipient_type'], (string) $row['recipient_id']);
+            $recipients[] = [(string) $row['recipient_type'], (string) $row['rid']];
         }
 
         return $recipients;
@@ -196,16 +214,18 @@ final readonly class DbalNotificationStore implements NotificationStoreInterface
     /**
      * {@inheritDoc}
      */
-    public function trimRecipient(RecipientRef $recipient, int $keep, int $limit): int
+    public function trimRecipient(string $recipientType, string $recipientId, int $keep, int $limit): int
     {
-        $connection = $this->transactions->connection();
-        $rows       = $connection->fetchAllAssociative(
-            sprintf('SELECT id, recipient_type, recipient_id FROM %s WHERE recipient_type = ? AND recipient_id = ? ORDER BY created_at DESC, id DESC LIMIT %d OFFSET %d', $this->table, $limit, $keep),
-            [$recipient->type, $recipient->id],
+        // The exact match runs in SQL before OFFSET / LIMIT (audit QL-M3), then again in PHP.
+        $connection       = $this->transactions->connection();
+        [$where, $values] = $this->exact($connection, ['recipient_type' => $recipientType, 'recipient_id' => $recipientId]);
+        $rows             = $connection->fetchAllAssociative(
+            sprintf('SELECT id, recipient_type, recipient_id FROM %s WHERE %s ORDER BY created_at DESC, id DESC LIMIT %d OFFSET %d', $this->table, $where, $limit, $keep),
+            $values,
         );
         $ids = [];
         foreach ($rows as $row) {
-            if ($row['recipient_type'] === $recipient->type && $row['recipient_id'] === $recipient->id) {
+            if ($row['recipient_type'] === $recipientType && $row['recipient_id'] === $recipientId) {
                 $ids[] = $row['id'];
             }
         }
@@ -239,11 +259,10 @@ final readonly class DbalNotificationStore implements NotificationStoreInterface
      */
     public function ofRecipient(RecipientRef $recipient, int $limit): array
     {
-        $rows = $this->transactions->connection()->fetchAllAssociative(
-            sprintf('SELECT %s FROM %s WHERE recipient_type = ? AND recipient_id = ? ORDER BY created_at DESC, id DESC LIMIT %d', self::COLUMNS, $this->table, $limit),
-            [$recipient->type, $recipient->id],
-        );
-        $notifications = [];
+        $connection       = $this->transactions->connection();
+        [$where, $values] = $this->exact($connection, ['recipient_type' => $recipient->type, 'recipient_id' => $recipient->id]);
+        $rows             = $connection->fetchAllAssociative(sprintf('SELECT %s FROM %s WHERE %s ORDER BY created_at DESC, id DESC LIMIT %d', self::COLUMNS, $this->table, $where, $limit), $values);
+        $notifications    = [];
         foreach ($rows as $row) {
             if ($row['recipient_type'] === $recipient->type && $row['recipient_id'] === $recipient->id) {
                 $notifications[] = $this->hydrate($row);
@@ -258,11 +277,10 @@ final readonly class DbalNotificationStore implements NotificationStoreInterface
      */
     public function countUnread(RecipientRef $recipient): int
     {
-        $rows = $this->transactions->connection()->fetchAllAssociative(
-            sprintf('SELECT recipient_type, recipient_id FROM %s WHERE recipient_type = ? AND recipient_id = ? AND read_at IS NULL', $this->table),
-            [$recipient->type, $recipient->id],
-        );
-        $count = 0;
+        $connection       = $this->transactions->connection();
+        [$where, $values] = $this->exact($connection, ['recipient_type' => $recipient->type, 'recipient_id' => $recipient->id]);
+        $rows             = $connection->fetchAllAssociative(sprintf('SELECT recipient_type, recipient_id FROM %s WHERE %s AND read_at IS NULL', $this->table, $where), $values);
+        $count            = 0;
         foreach ($rows as $row) {
             if ($row['recipient_type'] === $recipient->type && $row['recipient_id'] === $recipient->id) {
                 ++$count;
@@ -270,6 +288,32 @@ final readonly class DbalNotificationStore implements NotificationStoreInterface
         }
 
         return $count;
+    }
+
+    /**
+     * Equality on identifier columns that is exact before any LIMIT, OFFSET or GROUP BY (REQ-SEC-006 rule 6, audit
+     * QL-M3): the plain equality (index) plus, on MySQL / MariaDB, a byte comparison, so a PAD SPACE or case-insensitive
+     * column left by a host never folds `'42 '` into `'42'`. PostgreSQL and SQLite compare exactly already.
+     *
+     * @param array<string, string> $columns
+     *
+     * @return array{string, list<string>}
+     */
+    private function exact(Connection $connection, array $columns): array
+    {
+        $mysql  = $connection->getDatabasePlatform() instanceof AbstractMySQLPlatform;
+        $parts  = [];
+        $values = [];
+        foreach ($columns as $column => $value) {
+            $parts[]  = $column . ' = ?';
+            $values[] = $value;
+            if ($mysql) {
+                $parts[]  = 'CAST(' . $column . ' AS BINARY) = CAST(? AS BINARY)';
+                $values[] = $value;
+            }
+        }
+
+        return [implode(' AND ', $parts), $values];
     }
 
     /**

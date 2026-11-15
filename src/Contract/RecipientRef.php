@@ -18,12 +18,12 @@ final readonly class RecipientRef
 
     /**
      * @param string $type `^[a-z][a-z0-9_]{0,31}$`
-     * @param string $id 1–128 UTF-8 characters, no control characters
+     * @param string $id 1–128 UTF-8 characters, no control characters, no white space at the edges, no invisible characters
      */
     public function __construct(public string $type, public string $id)
     {
         Guard::key('RecipientRef type', $type);
-        Guard::identifier('RecipientRef id', $id, self::MAX_ID_LENGTH);
+        Guard::reference('RecipientRef id', $id, self::MAX_ID_LENGTH);
     }
 
     /**

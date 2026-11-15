@@ -52,10 +52,13 @@ final class DbalNotificationStoreTest extends TestCase
         self::assertSame(1, $this->store->countUnread($lower));
         self::assertCount(1, $this->store->ofRecipient($lower, 10));
         self::assertSame('usera', $this->store->ofRecipient($lower, 10)[0]->recipient()->id);
-        self::assertSame(1, $this->store->trimRecipient($lower, 0, 10));
+        self::assertSame(1, $this->store->trimRecipient('user', 'usera', 0, 10));
         self::assertSame(1, $this->store->countUnread($upper));
-        self::assertSame(0, $this->store->forgetContext(new ContextRef('project', 'p1'), 10), 'p1 is not P1');
-        self::assertSame(1, $this->store->forgetContext(new ContextRef('project', 'P1'), 10));
+        $batch = $this->store->forgetContext(new ContextRef('project', 'p1'), null, 1);
+        self::assertSame(0, $batch->deleted, 'p1 is not P1');
+        self::assertSame('01933b1c-5d2e-7a3b-8c4d-000000000001', $batch->cursor, 'the walk goes on past a refused row');
+        self::assertNull($this->store->forgetContext(new ContextRef('project', 'p1'), $batch->cursor, 1)->cursor);
+        self::assertSame(1, $this->store->forgetContext(new ContextRef('project', 'P1'), null, 10)->deleted);
     }
 
     public function testDamagedRowsReadSafely(): void
@@ -77,7 +80,7 @@ final class DbalNotificationStoreTest extends TestCase
         self::assertSame(2, $second->repeats());
         self::assertSame([], $third->params());
         self::assertSame(0, $this->store->deleteExpiredDedupe(new DateTimeImmutable('2026-11-15'), 10));
-        self::assertSame([], $this->store->recipientsOver(5, new RecipientRef('user', 'a'), 10));
+        self::assertSame([], $this->store->recipientsOver(5, ['user', 'a'], 10));
     }
 
     public function testTheConnectionIsTheEntityManagersOrTheDbalConnectionOfThatName(): void

@@ -111,6 +111,7 @@ final class ConfigurationTest extends TestCase
         yield 'recipient type' => [['recipient' => ['type' => 'User']], 'nowo_notify_kit.recipient.type'];
         yield 'empty service id' => [['recipient' => ['directory' => '']], 'Expected a service id or null'];
         yield 'type key' => [['types' => ['Issue.Assigned' => ['category' => 'issues']]], 'Every type key must match'];
+        yield 'type key with a trailing newline' => [['types' => ["issue.assigned\n" => ['category' => 'issues']]], 'Every type key must match'];
         yield 'type without category' => [['types' => ['issue.assigned' => []]], 'The child config "category" under "nowo_notify_kit.types.issue.assigned" must be configured'];
         yield 'permission without checker' => [['types' => ['issue.assigned' => ['category' => 'issues', 'permission' => 'issue.view']]], 'needs "nowo_notify_kit.access.checker"'];
         yield 'default permission without checker' => [['access' => ['default_permission' => 'project.view']], '"nowo_notify_kit.access.default_permission" needs "nowo_notify_kit.access.checker"'];

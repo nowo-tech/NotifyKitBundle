@@ -16,12 +16,12 @@ final readonly class ContextRef
 
     /**
      * @param string $type `^[a-z][a-z0-9_]{0,31}$`
-     * @param string $id 1–64 UTF-8 characters, no control characters
+     * @param string $id 1–64 UTF-8 characters, no control characters, no white space at the edges, no invisible characters
      */
     public function __construct(public string $type, public string $id)
     {
         Guard::key('ContextRef type', $type);
-        Guard::identifier('ContextRef id', $id, self::MAX_ID_LENGTH);
+        Guard::reference('ContextRef id', $id, self::MAX_ID_LENGTH);
     }
 
     /**

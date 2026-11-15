@@ -31,6 +31,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Default Doctrine `RecipientResolverInterface` (`recipient.class`).
   - Retention: `nowo:notify-kit:prune` (`--async`) and `PruneNotificationsMessage` (bounded runs, keyset cursor).
   - `nowo:notify-kit:schema-check`: compares the live tables with the mapping and prints the aligning SQL.
+  - Audit QL fixes before the first tag: events of a joined call run at a safe point after the commit (never inside
+    the driver commit) and are dropped with a rolled-back savepoint; binary NO PAD collations
+    (`utf8mb4_0900_bin` / `utf8mb4_nopad_bin`) and byte comparison before LIMIT / GROUP BY; keyset walk in
+    `forgetContext()`; one-statement dedupe claim (no gap lock); reference ids refuse edge white space and invisible
+    characters; `/D` on every anchored pattern.
   - Tests: standard and DDD hosts on SQLite, MySQL 8.4 and PostgreSQL 17 (DBAL 3 and 4), lock-wait and concurrent-writer
     tests, a 2,000-request worker test with two users, reference DDL checked against docs/INSTALLATION.md.
 

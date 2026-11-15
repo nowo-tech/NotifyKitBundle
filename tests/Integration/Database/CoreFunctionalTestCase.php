@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\NotifyKitBundle\Tests\Integration\Database;
 
+use Composer\InstalledVersions;
 use Doctrine\DBAL\Connection;
 use LogicException;
 use Nowo\NotifyKitBundle\Contract\ContextRef;
@@ -32,9 +33,12 @@ use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Throwable;
 
 use function array_map;
 use function sprintf;
+use function str_starts_with;
 use function strlen;
 
 /**
@@ -203,6 +207,9 @@ abstract class CoreFunctionalTestCase extends KernelTestCase
         $connection->commit();
         self::assertSame([], $this->listener()->events, 'a nested commit is not the outermost one');
         $connection->commit();
+        self::assertSame([], $this->listener()->events, 'never inside the driver commit (audit QL-M1)');
+        self::assertSame(1, $this->queue()->readyCount());
+        $this->queue()->reset(); // the request boundary
         self::assertCount(1, $this->listener()->of(NotificationRecordedEvent::class));
         self::assertSame(1, (int) $connection->fetchOne(sprintf('SELECT COUNT(*) FROM %s', $this->table())));
         self::assertSame(0, $this->flushSpy()->flushes);
@@ -221,7 +228,7 @@ abstract class CoreFunctionalTestCase extends KernelTestCase
         self::assertSame(2, $this->store()->countUnread($lower));
         self::assertSame(0, $this->store()->countUnread($this->r('USERA')));
         self::assertSame(['UserA'], array_map(static fn (Notification $n): string => $n->recipient()->id, $this->store()->ofRecipient($upper, 10)));
-        self::assertSame(1, $this->store()->trimRecipient($lower, 1, 10));
+        self::assertSame(1, $this->store()->trimRecipient($lower->type, $lower->id, 1, 10));
         self::assertSame(1, $this->store()->countUnread($upper), 'trimming usera never touches UserA');
     }
 
@@ -316,6 +323,122 @@ abstract class CoreFunctionalTestCase extends KernelTestCase
         $result = $this->notifier()->notify(new NotificationRequest('quiet.notice', [$this->r('a')], null, null, 'q', '/q'));
         self::assertSame(0, $result->written);
         self::assertSame(SkipReason::Preference, $this->listener()->of(NotificationSkippedEvent::class)[0]->reason);
+    }
+
+    public function testARolledBackSavepointAnnouncesNothing(): void
+    {
+        $this->boot();
+        $connection = $this->connection();
+        if (str_starts_with((string) InstalledVersions::getVersion('doctrine/dbal'), '3.')) {
+            // DBAL 3 emulates nesting by default (a nested rollback marks the whole transaction rollback-only).
+            $connection->setNestTransactionsWithSavepoints(true);
+        }
+
+        $connection->beginTransaction();
+        $connection->beginTransaction(); // the host's savepoint
+        $this->notifier()->notify(new NotificationRequest('invitation_accepted', [$this->r('a')], null, null, 'invite:1', '/a'));
+        $connection->rollBack();         // the host undoes the nested part
+        $connection->beginTransaction(); // a new savepoint at the same level, released
+        $this->notifier()->notify(new NotificationRequest('invitation_accepted', [$this->r('b')], null, null, 'invite:1', '/b'));
+        $connection->commit();
+        $connection->commit();
+        $this->queue()->reset();
+
+        self::assertSame(['b'], $this->column('SELECT recipient_id FROM %s'));
+        $recorded = $this->listener()->of(NotificationRecordedEvent::class);
+        self::assertCount(1, $recorded, 'no event for the row of the rolled-back savepoint (audit QL-M2)');
+        self::assertSame('b', $recorded[0]->recipient->id);
+    }
+
+    public function testAListenerMayOpenTransactionsAndNotifyAfterAJoinedCommit(): void
+    {
+        $kernel     = $this->boot();
+        $connection = $this->connection();
+        $connection->executeStatement('DROP TABLE IF EXISTS ql_side');
+        $connection->executeStatement('CREATE TABLE ql_side (n INT NOT NULL)');
+        $dispatcher = $kernel->getContainer()->get('event_dispatcher');
+        self::assertInstanceOf(EventDispatcherInterface::class, $dispatcher);
+        $levels = [];
+        $errors = [];
+        $host   = $this->host();
+        $dispatcher->addListener(NotificationRecordedEvent::class, function (NotificationRecordedEvent $event) use ($connection, $kernel, $host, &$levels, &$errors): void {
+            $levels[] = $connection->getTransactionNestingLevel();
+            try {
+                if ($event->recipient->id === 'a') {
+                    // A listener that changes its mind, then a host flush and a cascade notify().
+                    $connection->beginTransaction();
+                    $connection->executeStatement('INSERT INTO ql_side (n) VALUES (1)');
+                    $connection->rollBack();
+                    $host->createUser($kernel, 'from-listener');
+                    $this->notifier()->notify(new NotificationRequest('invitation_accepted', [$this->r('c')], null, null, 'cascade:1', '/c'));
+                }
+            } catch (Throwable $failure) {
+                $errors[] = $failure::class . ': ' . $failure->getMessage();
+            }
+        });
+
+        $connection->beginTransaction();
+        $this->notifier()->notify(new NotificationRequest('invitation_accepted', [$this->r('a')], null, null, 'invite:1', '/a'));
+        $connection->commit();
+        $this->queue()->reset();
+
+        self::assertSame([], $errors);
+        self::assertSame([0, 0], $levels, 'listeners run with the connection at level 0 (audit QL-M1)');
+        self::assertSame(0, $connection->getTransactionNestingLevel());
+        self::assertSame(0, (int) $connection->fetchOne('SELECT COUNT(*) FROM ql_side'), 'the listener rollback holds');
+        self::assertSame(['a', 'c'], $this->column('SELECT recipient_id FROM %s ORDER BY recipient_id'));
+        self::assertNotNull($this->host()->entityManager($kernel)->find($this->host()->kind === Host::STANDARD ? User::class : Member::class, 'from-listener'));
+        self::assertSame(0, $this->queue()->readyCount());
+        $connection->executeStatement('DROP TABLE ql_side');
+    }
+
+    public function testReadyEventsRunAtTheNextUnitOfWork(): void
+    {
+        $this->boot();
+        $connection = $this->connection();
+        $connection->beginTransaction();
+        $this->notifier()->notify(new NotificationRequest('invitation_accepted', [$this->r('a')], null, null, 'invite:1', '/a'));
+        $connection->commit();
+        self::assertSame([], $this->listener()->events);
+
+        $this->notifier()->notify(new NotificationRequest('invitation_accepted', [$this->r('b')], null, null, 'invite:1', '/b'));
+        $recorded = $this->listener()->of(NotificationRecordedEvent::class);
+        self::assertSame(['a', 'b'], array_map(static fn (NotificationRecordedEvent $e): string => $e->recipient->id, $recorded), 'oldest first');
+    }
+
+    public function testLookAlikeIdsNeverStandInForEachOther(): void
+    {
+        $this->boot(['retention' => ['batch_size' => 2, 'keep_per_recipient' => 2]]);
+        $connection = $this->connection();
+        $insert     = function (string $id, string $recipient, ?string $context, string $at) use ($connection): void {
+            $connection->insert($this->table(), ['id' => $id, 'recipient_type' => $this->host()->recipientType(), 'recipient_id' => $recipient, 'type' => 't', 'category' => 'general', 'context_type' => $context === null ? null : 'project', 'context_id' => $context, 'target' => 'x', 'url' => '/', 'params' => '{}', 'repeats' => 1, 'first_created_at' => $at, 'created_at' => $at]);
+        };
+        // Look-alike context rows sort first by id; a full batch of them must not stop the walk (audit QL-M3).
+        $insert('00000000-0000-7000-8000-000000000001', 'u', '42 ', '2026-11-15 09:00:00');
+        $insert('00000000-0000-7000-8000-000000000002', 'u', '42 ', '2026-11-15 09:00:00');
+        $insert('00000000-0000-7000-8000-000000000003', 'u', '42', '2026-11-15 09:00:00');
+        $insert('00000000-0000-7000-8000-000000000004', 'u', '42', '2026-11-15 09:00:00');
+        self::assertSame(2, $this->inbox()->forgetContext(new ContextRef('project', '42')));
+        self::assertSame(['42 ', '42 '], $this->column('SELECT context_id FROM %s ORDER BY id'));
+        $connection->executeStatement(sprintf('DELETE FROM %s', $this->table()));
+
+        // alice has 2 rows (the cap), 'alice ' and 'Alice' 2 newer each: nobody is over the cap.
+        $insert('00000000-0000-7000-8000-000000000011', 'alice', null, '2026-11-15 09:01:00');
+        $insert('00000000-0000-7000-8000-000000000012', 'alice', null, '2026-11-15 09:02:00');
+        $insert('00000000-0000-7000-8000-000000000013', 'alice ', null, '2026-11-15 09:03:00');
+        $insert('00000000-0000-7000-8000-000000000014', 'alice ', null, '2026-11-15 09:04:00');
+        $insert('00000000-0000-7000-8000-000000000015', 'Alice', null, '2026-11-15 09:05:00');
+        $insert('00000000-0000-7000-8000-000000000016', 'Alice', null, '2026-11-15 09:06:00');
+        self::assertSame([], $this->store()->recipientsOver(2, null, 10));
+        self::assertSame(0, $this->store()->trimRecipient($this->host()->recipientType(), 'alice', 2, 10));
+        self::assertSame(2, $this->store()->countUnread($this->r('alice')));
+        $tester = new CommandTester((new Application($this->kernel))->find('nowo:notify-kit:prune'));
+        self::assertSame(0, $tester->execute([]));
+        self::assertSame(6, (int) $connection->fetchOne(sprintf('SELECT COUNT(*) FROM %s', $this->table())), 'retention deletes nobody');
+
+        // A coalescing repeat of alice never updates a look-alike's row.
+        $this->notifier()->notify(new NotificationRequest('invitation_accepted', [$this->r('alice')], null, null, 'x', '/a'));
+        self::assertSame(3, $this->store()->countUnread($this->r('alice')));
     }
 
     protected function r(string $id): RecipientRef

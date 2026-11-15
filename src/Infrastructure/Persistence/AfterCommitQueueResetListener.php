@@ -7,7 +7,7 @@ namespace Nowo\NotifyKitBundle\Infrastructure\Persistence;
 use Symfony\Component\HttpKernel\Event\FinishRequestEvent;
 
 /**
- * Clears the {@see AfterCommitQueue} at every request and message boundary (`kernel.finish_request` of the main
+ * Drains the ready work of the {@see AfterCommitQueue} and drops what is still held at every request and message boundary (`kernel.finish_request` of the main
  * request, `kernel.terminate`, `console.terminate`, Messenger `WorkerMessageHandledEvent` / `WorkerMessageFailedEvent`),
  * so worker mode without the services resetter never carries held work into the next request.
  *

@@ -30,11 +30,9 @@ interface NotificationStoreInterface
     public function claimDedupe(string $keyHash, DateTimeImmutable $now, DateTimeImmutable $until): bool;
 
     /**
-     * Deletes at most $limit rows of a context.
-     *
-     * @return int rows deleted
+     * Deletes the rows of a context among the next $limit rows after $afterId (keyset by id; null = from the start).
      */
-    public function forgetContext(ContextRef $context, int $limit): int;
+    public function forgetContext(ContextRef $context, ?string $afterId, int $limit): BatchResult;
 
     /**
      * Deletes at most $limit read rows created before $cutoff.
@@ -44,18 +42,21 @@ interface NotificationStoreInterface
     public function deleteReadBefore(DateTimeImmutable $cutoff, int $limit): int;
 
     /**
-     * Recipients with more than $keep rows, after $after in (type, id) order (keyset).
+     * Recipients (type, id as stored) with more than $keep rows, after $after in (type, id) order (keyset). Raw pairs:
+     * a stored id the value objects would refuse today is still trimmed.
      *
-     * @return list<RecipientRef>
+     * @param array{string, string}|null $after
+     *
+     * @return list<array{string, string}>
      */
-    public function recipientsOver(int $keep, ?RecipientRef $after, int $limit): array;
+    public function recipientsOver(int $keep, ?array $after, int $limit): array;
 
     /**
-     * Deletes at most $limit rows of $recipient beyond its newest $keep.
+     * Deletes at most $limit rows of the recipient beyond its newest $keep.
      *
      * @return int rows deleted
      */
-    public function trimRecipient(RecipientRef $recipient, int $keep, int $limit): int;
+    public function trimRecipient(string $recipientType, string $recipientId, int $keep, int $limit): int;
 
     /**
      * Deletes at most $limit dedupe markers expired at $now.
