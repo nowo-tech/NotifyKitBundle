@@ -13,6 +13,7 @@
 - [Retention and schema check](#retention-and-schema-check)
 - [Using it from a DDD / hexagonal application](#using-it-from-a-ddd--hexagonal-application)
 - [FrankenPHP worker mode](#frankenphp-worker-mode)
+- [Translations and overrides](#translations-and-overrides)
 
 ## In a standard Symfony application
 
@@ -141,3 +142,24 @@ Both host kinds run the same functional suite (`tests/Integration/Database/Stand
 Every service is stateless except the after-commit queue, which holds the events of a transaction that joined a host
 transaction and is cleared at every request, command and message boundary (and on `kernel.reset`). See
 [FRANKENPHP-WORKER-AUDIT.md](FRANKENPHP-WORKER-AUDIT.md).
+
+## Translations and overrides
+
+The bundle's strings (bundle name, the generic notification type title, the `general` category, …) live in the
+translation domain `NowoNotifyKitBundle`, shipped in `src/Resources/translations/NowoNotifyKitBundle.{en,es,it,fr,pt,de,nl}.yaml`
+with the same keys in every locale.
+
+To change a string, or to add a locale, create the same domain file in your application; application translations win
+over the bundle's:
+
+```yaml
+# translations/NowoNotifyKitBundle.en.yaml
+notify:
+    category:
+        general: "Updates"
+```
+
+Clear the cache after adding a new file (`bin/console cache:clear`). The title of a notification type is the
+translation key `title_key` of its registry entry (`notify.type.<key>.title` by default); the bundle ships only
+`notify.type.generic.title`, so add the keys of the types you register to your application's
+`NowoNotifyKitBundle.<locale>.yaml` files.
