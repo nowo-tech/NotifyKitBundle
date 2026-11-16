@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Documentation
+
+- REQ compliance sweep 2026-11-16: baseline spec user scenarios (US-01..04), non-goals and validation commands (REQ-SPECKIT-003); Spec Kit section in SPEC-DRIVEN-DEVELOPMENT.md (REQ-SPECKIT-002); translation overrides in USAGE.md (REQ-I18N-001); README "Found this useful?" line and Code of Conduct link (REQ-DOCS-009, REQ-DOCS-015, REQ-DOCS-019); committed demo `.env.test` (REQ-DEMO-003).
+
 ## [0.1.0] - 2026-11-15
 
 ### Added

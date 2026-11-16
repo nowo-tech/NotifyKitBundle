@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/nowo-tech/NotifyKitBundle/actions/workflows/ci.yml/badge.svg)](https://github.com/nowo-tech/NotifyKitBundle/actions/workflows/ci.yml) [![Packagist Version](https://img.shields.io/packagist/v/nowo-tech/notify-kit-bundle.svg?style=flat)](https://packagist.org/packages/nowo-tech/notify-kit-bundle) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![PHP](https://img.shields.io/badge/PHP-8.2%2B-777BB4?logo=php)](https://php.net) [![Symfony](https://img.shields.io/badge/Symfony-7.4%20%7C%208.0%20%7C%208.1%2B-000000?logo=symfony)](https://symfony.com) [![Coverage](https://img.shields.io/badge/Coverage-100%25-brightgreen)](#tests-and-coverage)
 
+> ⭐ **Found this useful?** Install it from [Packagist](https://packagist.org/packages/nowo-tech/notify-kit-bundle) and give it a star on [GitHub](https://github.com/nowo-tech/NotifyKitBundle): it helps us maintain and improve the project.
+
 **Notifications for Symfony: one notify() call, an in-app inbox with a real-time badge, per-person preferences by category and channel, quiet hours and digests, mail / push / Slack channels and GDPR export and erasure.**
 
 > 🚧 **Status: 0.1.0 (S1 core inbox).** The package is built slice by slice from its design contract
@@ -70,6 +72,7 @@ Every key of the contract is already accepted (strict tree): [docs/CONFIGURATION
 - [Upgrading](docs/UPGRADING.md) · [Changelog](docs/CHANGELOG.md) · [Release](docs/RELEASE.md)
 - [Architecture](docs/ARCHITECTURE.md) · [PSR](docs/PSR.md) · [Spec-driven development](docs/SPEC-DRIVEN-DEVELOPMENT.md) · [Spec Kit](docs/SPEC-KIT.md)
 - [Contributing](docs/CONTRIBUTING.md) · [GitHub CI](docs/GITHUB_CI.md) · [Engram](docs/ENGRAM.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ## Requirements
 

@@ -9,7 +9,9 @@ This repository follows the Nowo spec-driven workflow:
    [`CONFIGURATION.md`](CONFIGURATION.md), [`INSTALLATION.md`](INSTALLATION.md)). **PHPUnit** and **PHPStan** enforce
    it in CI.
 3. **Baseline** — [`specs/001-baseline/spec.md`](../specs/001-baseline/spec.md) and the 100 % code inventory
-   [`specs/001-baseline/code-inventory.md`](../specs/001-baseline/code-inventory.md). Every slice updates both.
+   [`specs/001-baseline/code-inventory.md`](../specs/001-baseline/code-inventory.md). Every slice updates both and adds
+   its own feature spec (S1: [`specs/002-s1-core-inbox/spec.md`](../specs/002-s1-core-inbox/spec.md)). The specs are
+   managed with **GitHub Spec Kit** (`.specify/`); the operator manual is [SPEC-KIT.md](SPEC-KIT.md).
 4. **Repository REQs** — `BUNDLES_FULL_SPECS_DETAILS.md` (Makefile, CI, demo, docs, security). The bundle reaches 100 %
    of the applicable REQs before 1.0.0 (`bundle-req-audit`), plus the REQ-SEC-004 audit.
 
@@ -17,6 +19,7 @@ This repository follows the Nowo spec-driven workflow:
 
 - [User stories (S0)](#user-stories-s0)
 - [Slices](#slices)
+- [GitHub Spec Kit](#github-spec-kit)
 
 ## User stories (S0)
 
@@ -29,3 +32,9 @@ This repository follows the Nowo spec-driven workflow:
 ## Slices
 
 See [ROADMAP.md](ROADMAP.md).
+
+## GitHub Spec Kit
+
+The baseline and slice specs live under `specs/` and are created and updated with GitHub Spec Kit (`.specify/`
+templates and scripts). [SPEC-KIT.md](SPEC-KIT.md) explains the commands (`specify`, `/speckit.*`), where each artefact
+goes and how a slice keeps `specs/001-baseline/code-inventory.md` at 100 % of `src/`.
