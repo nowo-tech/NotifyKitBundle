@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-17
+
 ### Changed
 
 - `PruneNotificationsHandler` carries `#[AsMessageHandler]` and is registered through autoconfiguration instead of an explicit `messenger.message_handler` tag (REQ-MSG-001); the handler is registered exactly once, as before.
@@ -20,6 +22,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Documentation
 
 - REQ compliance sweep 2026-11-16: baseline spec user scenarios (US-01..04), non-goals and validation commands (REQ-SPECKIT-003); Spec Kit section in SPEC-DRIVEN-DEVELOPMENT.md (REQ-SPECKIT-002); translation overrides in USAGE.md (REQ-I18N-001); README "Found this useful?" line and Code of Conduct link (REQ-DOCS-009, REQ-DOCS-015, REQ-DOCS-019); committed demo `.env.test` (REQ-DEMO-003).
+
+[0.1.1]: https://github.com/nowo-tech/NotifyKitBundle/releases/tag/v0.1.1
 
 ## [0.1.0] - 2026-11-15
 
@@ -77,5 +81,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   every MySQL dedupe claim look successful, so a duplicate notice can get through (fails open: no leak). Leave it off on
   that connection.
 
-[Unreleased]: https://github.com/nowo-tech/NotifyKitBundle/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/nowo-tech/NotifyKitBundle/compare/v0.1.1...HEAD
 [0.1.0]: https://github.com/nowo-tech/NotifyKitBundle/releases/tag/v0.1.0

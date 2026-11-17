@@ -3,9 +3,18 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.1.1](#to-011)
 - [To 0.1.0](#to-010)
 
 ## Unreleased
+
+## To 0.1.1
+
+From **0.1.0**:
+
+```bash
+composer update nowo-tech/notify-kit-bundle
+```
 
 Nothing yet.
 
