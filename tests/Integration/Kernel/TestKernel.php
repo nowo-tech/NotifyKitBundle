@@ -11,6 +11,7 @@ use Nowo\NotifyKitBundle\Tests\Fixtures\NotifyController;
 use Psr\Log\NullLogger;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
@@ -30,6 +31,7 @@ final class TestKernel extends Kernel
      * @param array<string, mixed> $bundleConfig `nowo_notify_kit` configuration
      * @param string|null $databaseUrl DBAL URL; null = no DoctrineBundle
      * @param (Closure(ContainerConfigurator, string): void)|null $configure extra host configuration
+     * @param (Closure(ContainerBuilder): void)|null $build hook to add compiler passes (inspect the compiled container)
      */
     public function __construct(
         private readonly string $id,
@@ -37,6 +39,7 @@ final class TestKernel extends Kernel
         private readonly ?string $databaseUrl = null,
         private readonly ?Closure $configure = null,
         private readonly bool $notifyRoute = false,
+        private readonly ?Closure $build = null,
     ) {
         parent::__construct('test', false);
     }
@@ -68,6 +71,13 @@ final class TestKernel extends Kernel
     public static function baseDir(): string
     {
         return sys_get_temp_dir() . '/nowo-notify-kit-tests';
+    }
+
+    protected function build(ContainerBuilder $container): void
+    {
+        if ($this->build instanceof Closure) {
+            ($this->build)($container);
+        }
     }
 
     protected function configureContainer(ContainerConfigurator $container): void
