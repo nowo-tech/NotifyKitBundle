@@ -6,7 +6,7 @@ COMPOSE_BIN := $(shell docker compose version >/dev/null 2>&1 && echo "docker co
 COMPOSE     := $(COMPOSE_BIN) -f $(COMPOSE_FILE)
 SERVICE_PHP := php
 
-.PHONY: help up down restart build install shell logs setup db-schema cache-clear update-bundle ensure-up test
+.PHONY: help up down restart build install shell logs setup db-schema cache-clear update-bundle ensure-up test test-e2e demo-screenshots
 
 help:
 	@echo "Notify Kit Bundle Demo - Symfony 8"
@@ -94,3 +94,28 @@ update-bundle: ensure-up
 test: ensure-up
 	$(COMPOSE) exec -T $(SERVICE_PHP) php bin/console lint:container
 	$(COMPOSE) exec -T $(SERVICE_PHP) php bin/console lint:twig templates
+
+# REQ-DEMO-013: Playwright e2e + README screenshots (official Playwright image, PNG -> WebP with sharp).
+PLAYWRIGHT_IMAGE ?= mcr.microsoft.com/playwright:v1.63.0-jammy
+
+test-e2e: ensure-up
+	@mkdir -p e2e/node_modules
+	@PORT=$$(grep -E '^PORT=' .env 2>/dev/null | cut -d= -f2 | tr -d '\r'); PORT=$${PORT:-8222}; \
+	docker run --rm --network host \
+		-v "$(CURDIR)/e2e:/e2e" -w /e2e \
+		-e DEMO_BASE_URL=http://127.0.0.1:$$PORT \
+		$(PLAYWRIGHT_IMAGE) \
+		bash -lc 'npm ci --no-fund --no-audit && npx playwright test --project=chromium --workers=1'
+
+demo-screenshots: ensure-up
+	@mkdir -p ../../docs/images/demo e2e/node_modules
+	@PORT=$$(grep -E '^PORT=' .env 2>/dev/null | cut -d= -f2 | tr -d '\r'); PORT=$${PORT:-8222}; \
+	docker run --rm --network host \
+		-v "$(CURDIR)/e2e:/e2e" \
+		-v "$(CURDIR)/../../docs/images/demo:/screenshots" \
+		-w /e2e \
+		-e DEMO_BASE_URL=http://127.0.0.1:$$PORT \
+		-e SCREENSHOT_DIR=/screenshots \
+		$(PLAYWRIGHT_IMAGE) \
+		bash -lc 'npm ci --no-fund --no-audit && npx playwright test --project=screenshots --workers=1 && node scripts/to-webp.mjs /screenshots'
+	@echo "Screenshots written under docs/images/demo/ (WebP)"

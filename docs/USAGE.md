@@ -121,6 +121,11 @@ foreign key (Q-B6). From S2 the inbox also hides rows whose context the recipien
 - `--async` only dispatches a `Contract\Message\PruneNotificationsMessage` (route it to your maintenance transport); the
   handler stops after `messenger.max_seconds` and dispatches the remainder with a keyset cursor. Schedule one of them
   daily (the bundle's scheduler recipe arrives with S4).
+- Messenger policy (REQ-MSG-001): `PruneNotificationsHandler` is registered with `#[AsMessageHandler]`. Without a
+  transport route the message is handled synchronously. The handler is idempotent: a redelivered message deletes only
+  what is still past retention, and every batch is its own transaction, so a failed run leaves earlier batches in place.
+  On an async transport use the host's `retry_strategy` (a failed run is safe to retry) and a `failure_transport` for
+  messages that exhaust their retries; the log line carries counts only, never row content.
 - `php bin/console nowo:notify-kit:schema-check` compares the live tables with the mapping (columns, binary collations,
   indexes, prefix): exit 0 when they match, 1 with the SQL that would align them.
 

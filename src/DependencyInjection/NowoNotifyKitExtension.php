@@ -11,7 +11,6 @@ use Nowo\NotifyKitBundle\Application\Notifier;
 use Nowo\NotifyKitBundle\Application\Retention\Retention;
 use Nowo\NotifyKitBundle\Application\TypeRegistry;
 use Nowo\NotifyKitBundle\Contract\InboxInterface;
-use Nowo\NotifyKitBundle\Contract\Message\PruneNotificationsMessage;
 use Nowo\NotifyKitBundle\Contract\NotifierInterface;
 use Nowo\NotifyKitBundle\Contract\RecipientAccessCheckerInterface;
 use Nowo\NotifyKitBundle\Contract\RecipientResolverInterface;
@@ -202,8 +201,8 @@ final class NowoNotifyKitExtension extends Extension implements PrependExtension
         ]);
         if ($messenger) {
             $container->register(PruneNotificationsHandler::class, PruneNotificationsHandler::class)
-                ->setArguments([new Reference(Retention::class), $bus, $logger])
-                ->addTag('messenger.message_handler', ['handles' => PruneNotificationsMessage::class]);
+                ->setAutoconfigured(true)
+                ->setArguments([new Reference(Retention::class), $bus, $logger]);
         }
         $container->register(SchemaChecker::class, SchemaChecker::class)->setArguments([new Reference('doctrine'), $doctrine['entity_manager'], $doctrine['table_prefix']]);
 

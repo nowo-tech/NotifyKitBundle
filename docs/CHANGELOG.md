@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- `PruneNotificationsHandler` carries `#[AsMessageHandler]` and is registered through autoconfiguration instead of an explicit `messenger.message_handler` tag (REQ-MSG-001); the handler is registered exactly once, as before.
+
+### Demo
+
+- The demo shell is UiKit's admin layout with UiKit's default theme (REQ-DEMO-014); the Bootstrap CDN shell is gone.
+- Dev stack (REQ-DEMO-001): Web Profiler, debug, Twig Inspector and Hot Reload (Caddy `mercure` + `hot_reload`), Flex pin `8.1.*` (REQ-DEMO-012).
+- Playwright e2e and a WebP screenshot (REQ-DEMO-013): `make test-e2e`, `make demo-screenshots`.
+
 ### Documentation
 
 - REQ compliance sweep 2026-11-16: baseline spec user scenarios (US-01..04), non-goals and validation commands (REQ-SPECKIT-003); Spec Kit section in SPEC-DRIVEN-DEVELOPMENT.md (REQ-SPECKIT-002); translation overrides in USAGE.md (REQ-I18N-001); README "Found this useful?" line and Code of Conduct link (REQ-DOCS-009, REQ-DOCS-015, REQ-DOCS-019); committed demo `.env.test` (REQ-DEMO-003).
