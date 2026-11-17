@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Tests
+
+- Compiled-kernel test (`MessengerHandlerTest`): with FrameworkBundle autoconfiguration, `PruneNotificationsHandler` (`#[AsMessageHandler]`) is tagged `messenger.message_handler` exactly once, and no handler is registered while the bundle is disabled (audit SE follow-up). No behaviour change.
+
 ## [0.1.1] - 2026-11-17
 
 ### Changed
