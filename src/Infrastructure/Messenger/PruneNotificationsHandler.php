@@ -9,15 +9,17 @@ use Nowo\NotifyKitBundle\Application\Retention\RetentionReport;
 use Nowo\NotifyKitBundle\Contract\Message\PruneNotificationsMessage;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * Handles {@see PruneNotificationsMessage} (tag `messenger.message_handler`): one {@see Retention} run within
+ * Handles {@see PruneNotificationsMessage} (`#[AsMessageHandler]`, REQ-MSG-001): one {@see Retention} run within
  * `messenger.max_seconds`, then the remainder is dispatched as a new message (keyset cursor). Without a bus the
  * remainder runs at once, in further bounded runs.
  *
  * Stateless (worker mode).
  */
+#[AsMessageHandler]
 final readonly class PruneNotificationsHandler
 {
     /**

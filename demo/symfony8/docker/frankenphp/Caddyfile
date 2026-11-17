@@ -1,4 +1,5 @@
 {
+	order mercure after encode
 	skip_install_trust
 }
 
@@ -7,8 +8,13 @@
 :80 {
 	root * /app/public
 	encode zstd br gzip
+	# Dev only: Mercure + hot reload (REQ-DEMO-001).
+	mercure {
+		anonymous
+	}
 
 	php_server {
+		hot_reload
 		worker {
 			file /app/public/index.php
 			watch

@@ -49,6 +49,11 @@ composer require nowo-tech/notify-kit-bundle
 
 See [docs/INSTALLATION.md](docs/INSTALLATION.md). Nothing is registered while `nowo_notify_kit.enabled` is false.
 
+## Requirements
+
+- PHP >= 8.2, < 8.6
+- Symfony 7.4, 8.0 or 8.1
+
 ## Configuration
 
 ```yaml
@@ -58,6 +63,12 @@ nowo_notify_kit:
 ```
 
 Every key of the contract is already accepted (strict tree): [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+
+## Demo
+
+`demo/symfony8`: Symfony 8.1, FrankenPHP worker mode, MySQL, on http://localhost:8222 (`make -C demo up`), built on UiKit; `make -C demo/symfony8 test-e2e` runs the Playwright check.
+
+![Notify Kit demo](docs/images/demo/overview.webp)
 
 ## Documentation
 
@@ -73,15 +84,6 @@ Every key of the contract is already accepted (strict tree): [docs/CONFIGURATION
 - [Architecture](docs/ARCHITECTURE.md) · [PSR](docs/PSR.md) · [Spec-driven development](docs/SPEC-DRIVEN-DEVELOPMENT.md) · [Spec Kit](docs/SPEC-KIT.md)
 - [Contributing](docs/CONTRIBUTING.md) · [GitHub CI](docs/GITHUB_CI.md) · [Engram](docs/ENGRAM.md)
 - [Code of Conduct](CODE_OF_CONDUCT.md)
-
-## Requirements
-
-- PHP >= 8.2, < 8.6
-- Symfony 7.4, 8.0 or 8.1
-
-## Demo
-
-`demo/symfony8`: Symfony 8.1, FrankenPHP worker mode, MySQL, on http://localhost:8222 (`make -C demo up`).
 
 ## Tests and coverage
 

@@ -4,14 +4,17 @@
     "type": "project",
     "license": "MIT",
     "require": {
-        "php": ">=8.4,<8.6",
         "doctrine/dbal": "^4.0",
         "doctrine/doctrine-bundle": "^2.13 || ^3.0",
         "nowo-tech/notify-kit-bundle": "@dev",
+        "nowo-tech/ui-kit-bundle": "^2.53",
+        "php": ">=8.4,<8.6",
+        "symfony/asset": "8.1.*",
         "symfony/console": "8.1.*",
         "symfony/dotenv": "8.1.*",
         "symfony/framework-bundle": "8.1.*",
         "symfony/runtime": "8.1.*",
+        "symfony/translation": "8.1.*",
         "symfony/twig-bundle": "8.1.*",
         "symfony/yaml": "8.1.*",
         "twig/extra-bundle": "^3.12",
@@ -40,10 +43,12 @@
     },
     "scripts": {
         "post-install-cmd": [
-            "@php bin/console cache:clear --no-warmup"
+            "@php bin/console cache:clear --no-warmup",
+            "@php bin/console assets:install public --no-interaction"
         ],
         "post-update-cmd": [
-            "@php bin/console cache:clear --no-warmup"
+            "@php bin/console cache:clear --no-warmup",
+            "@php bin/console assets:install public --no-interaction"
         ]
     },
     "conflict": {
@@ -57,5 +62,17 @@
                 "symlink": true
             }
         }
-    ]
+    ],
+    "require-dev": {
+        "nowo-tech/hot-reload-bundle": "^1.4",
+        "nowo-tech/twig-inspector-bundle": "^1.0",
+        "symfony/debug-bundle": "^8.1",
+        "symfony/web-profiler-bundle": "^8.1"
+    },
+    "extra": {
+        "symfony": {
+            "allow-contrib": false,
+            "require": "8.1.*"
+        }
+    }
 }

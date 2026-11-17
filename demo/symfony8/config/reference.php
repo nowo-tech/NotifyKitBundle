@@ -267,7 +267,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         formats?: array<string, Param|string|list<scalar|Param|null>>,
  *     },
  *     assets?: bool|array{ // Assets configuration
- *         enabled?: bool|Param, // Default: false
+ *         enabled?: bool|Param, // Default: true
  *         strict_mode?: bool|Param, // Throw an exception if an entry is missing from the manifest.json. // Default: false
  *         version_strategy?: scalar|Param|null, // Default: null
  *         version?: scalar|Param|null, // Default: null
@@ -305,7 +305,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         },
  *     },
  *     translator?: bool|array{ // Translator configuration
- *         enabled?: bool|Param, // Default: false
+ *         enabled?: bool|Param, // Default: true
  *         fallbacks?: Param|string|list<scalar|Param|null>,
  *         logging?: bool|Param, // Default: false
  *         formatter?: scalar|Param|null, // Default: "translator.formatter.default"
@@ -646,7 +646,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         }>,
  *     },
  *     uid?: bool|array{ // Uid configuration
- *         enabled?: bool|Param, // Default: false
+ *         enabled?: bool|Param, // Default: true
  *         default_uuid_version?: 7|6|4|1|Param, // Default: 7
  *         name_based_uuid_version?: 5|3|Param, // Default: 5
  *         name_based_uuid_namespace?: scalar|Param|null,
@@ -978,6 +978,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         table_prefix?: scalar|Param|null, // Default: "nowo_"
  *         auto_mapping?: bool|Param, // false = DDD host: register the XML mapping on your own entity manager // Default: true
  *         mapping?: "xml"|"attribute"|Param, // xml (plain domain class, default) or attribute (twin record class, same schema) // Default: "xml"
+ *         transaction_runner?: scalar|Param|null, // nowo-tech/transaction-contract runner of the bundle writes, on the bundle connection, flushing no EntityManager (e.g. a retrying adapter); null = one attempt per write (nowo-tech/transaction-doctrine) // Default: null
  *     },
  *     recipient?: array{
  *         type?: scalar|Param|null, // Default: "user"
@@ -1127,6 +1128,251 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     },
  *     settings_provider?: scalar|Param|null, // Settings provider service; null = configuration values // Default: null
  * }
+ * @psalm-type NowoUiKitConfig = array{
+ *     css_framework?: "bootstrap"|"bootstrap5"|"bootstrap4"|"tailwind"|"foundation"|"custom"|"tabler"|"none"|Param, // Host CSS stack: bootstrap5|bootstrap4|tailwind|foundation|custom|none|tabler (bootstrap alias → bootstrap5). // Default: "bootstrap5"
+ *     icon_set?: "bootstrap-icons"|"tabler-icons"|"ux_icon"|"svg_inline"|"none"|Param, // Icon rendering: bootstrap-icons|tabler-icons|ux_icon|svg_inline|none. // Default: "bootstrap-icons"
+ *     row_actions_display?: "icon"|"text"|"icon_text"|Param, // Table/list row actions: icon (glyph only) | text (label only) | icon_text (both). // Default: "icon"
+ *     row_actions_confirm?: "inline"|"native"|"dialog"|Param, // confirm_message of 1.x row_actions POST hashes (2.22, REQ-UI-003): inline = onsubmit="return confirm(…)" (default, unchanged markup); native | dialog = no inline handler, the confirm-submit Stimulus peer asks (window.confirm or the kit <dialog>). native / dialog need the confirm-submit peer registered. // Default: "inline"
+ *     action_icons?: array<string, scalar|Param|null>,
+ *     action_variants?: array<string, scalar|Param|null>,
+ *     panel_path_rewrites?: array<string, scalar|Param|null>,
+ *     release_check?: array{ // Optional GitHub release-version checker (footer dialog + JSON endpoint). Off by default.
+ *         enabled?: bool|Param, // Register the checker service + controller. Also import @NowoUiKitBundle/Resources/config/routes/release_check.yaml. Since 2.33 also a container parameter or "%env(bool:…)%" (false at runtime = the check is skipped and the endpoint answers 404). // Default: false
+ *         github_repo?: scalar|Param|null, // Public GitHub repository "owner/name" whose releases are compared (e.g. nowo-tech/my-app). // Default: ""
+ *         current_version?: scalar|Param|null, // Installed version label, clean semver x.y.z with optional "v" (e.g. "%app.version%"). Non-semver values skip the check. // Default: ""
+ *         cache_ttl?: int|Param, // Seconds to cache the GitHub answer (cache.app). Default 12h. // Default: 43200
+ *         default_branch?: scalar|Param|null, // Branch used as compare target when the installed version is already the latest. // Default: "main"
+ *         user_agent?: scalar|Param|null, // User-Agent sent to api.github.com. // Default: "nowo-ui-kit-release-check"
+ *         timeout?: float|Param, // Idle timeout in seconds of the GitHub "releases/latest" request (HttpClient "timeout"). Keep it below PHP max_execution_time (REQ-RUNTIME-001). // Default: 5.0
+ *         releases_timeout?: float|Param, // Idle timeout in seconds of the GitHub "releases" listing used to count versions behind. Keep it below PHP max_execution_time (REQ-RUNTIME-001). // Default: 8.0
+ *     },
+ *     route_links?: array{ // Route (or route prefix) → link map read by nowo_ui_route_link(), e.g. for the page-edge "manual" tab (partials/_edge_tab.html.twig). A prefix matches the route itself or any route starting with "<prefix>_"; the longest prefix wins.
+ *         base_url?: scalar|Param|null, // Prepended to every relative path (paths starting with "/", "//", "http://" or "https://" are used as is). // Default: ""
+ *         default_testid?: scalar|Param|null, // testid returned for entries without their own. // Default: null
+ *         routes?: array<string, Param|string|array{ // Default: []
+ *             path?: scalar|Param|null,
+ *             testid?: scalar|Param|null, // Default: null
+ *         }>,
+ *     },
+ *     base_stylesheet?: bool|Param, // 2.51: link UiKit's opt-in default theme (css/nowo-ui-base.css) before nowo-ui.css in the document / error layouts: body font stack, page gutters and masthead height for hosts that bring no CSS framework and no theme stylesheet. Its rules nest in `@layer theme.nowo-ui-base`, below `base`, so a framework, host utilities and unlayered host CSS still win. Leave it false when the host already has a framework or a theme file. // Default: false
+ *     font_preload?: array{ // 2.21: <link rel="preload" as="font" crossorigin> tags printed in the <head> of the document and error layouts (Twig nowo_ui_font_preload()) for the fonts painted above the fold. Empty = no tags.
+ *         fonts?: list<scalar|Param|null>,
+ *         manifest?: array{ // Hashed builds: pick the fonts from a Vite manifest (.vite/manifest.json). A missing manifest (dev server) prints nothing.
+ *             path?: scalar|Param|null, // Absolute path of the manifest, e.g. "%kernel.project_dir%/public/build/.vite/manifest.json"; null = off. // Default: null
+ *             entry?: scalar|Param|null, // Manifest entry whose "assets" list holds the fonts. // Default: "assets/app.js"
+ *             prefixes?: list<scalar|Param|null>,
+ *             base?: scalar|Param|null, // Public URL prefix of the manifest assets. // Default: "/build/"
+ *         },
+ *     },
+ *     appearance?: array{ // Optional site appearance SPI (presets, --nowo-ui-* token emitter, Twig functions). Off by default.
+ *         enabled?: bool|Param, // Default: false
+ *         provider?: scalar|Param|null, // Service id implementing AppearanceProviderInterface (host storage). Null = the config defaults below (or, 2.40, the brand provider: see brand). // Default: null
+ *         brand?: "auto"|"off"|Param, // 2.40 (spec 220): auto = with provider null and a nowo-tech/brand-contracts BrandProviderInterface service, the brand drives the name, eyebrow, colours and logos (corner, border and footer stay from defaults). off = always the defaults. No brand service = no change. // Default: "auto"
+ *         head_links?: bool|Param, // 2.40: the kit layouts (document, error) print nowo_ui_appearance_head() in <head>: favicon / apple-touch links of the appearance logos and meta theme-color (paper colour per colour scheme). Off = the 2.39 <head>. // Default: false
+ *         defaults?: array{
+ *             brand_name?: scalar|Param|null, // Default: ""
+ *             brand_eyebrow?: scalar|Param|null, // Default: ""
+ *             preset?: scalar|Param|null, // Preset whose light colours are the default. // Default: "slate"
+ *             preset_dark?: scalar|Param|null, // Preset whose dark colours are the default. // Default: "midnight"
+ *             corner_style?: "sharp"|"soft"|"rounded"|Param, // Default: "soft"
+ *             border_strength?: "subtle"|"medium"|"strong"|Param, // Default: "medium"
+ *             footer_fixed?: bool|Param, // Default: false
+ *         },
+ *         presets?: array<string, array{ // Default: []
+ *             mode?: "light"|"dark"|Param, // Default: "light"
+ *             light?: array{
+ *                 accent?: scalar|Param|null,
+ *                 accent_deep?: scalar|Param|null,
+ *                 danger?: scalar|Param|null,
+ *                 warn?: scalar|Param|null,
+ *                 paper?: scalar|Param|null,
+ *                 ink?: scalar|Param|null,
+ *                 surface?: scalar|Param|null,
+ *             },
+ *             dark?: array{
+ *                 accent?: scalar|Param|null,
+ *                 accent_deep?: scalar|Param|null,
+ *                 danger?: scalar|Param|null,
+ *                 warn?: scalar|Param|null,
+ *                 paper?: scalar|Param|null,
+ *                 ink?: scalar|Param|null,
+ *                 surface?: scalar|Param|null,
+ *             },
+ *         }>,
+ *         builtin_presets?: list<scalar|Param|null>,
+ *         kit_tokens?: bool|Param, // Emit the --nowo-ui-* tokens. False = only the token_aliases are written. // Default: true
+ *         token_aliases?: array<string, list<scalar|Param|null>>,
+ *         selectors?: array{ // Selectors of the three emitted blocks.
+ *             root?: scalar|Param|null, // Default: ":root"
+ *             light?: scalar|Param|null, // Default: ":root, [data-theme=\"light\"]"
+ *             dark?: scalar|Param|null, // Default: "[data-theme=\"dark\"]"
+ *         },
+ *         shadow_rgb_fallback?: scalar|Param|null, // --nowo-ui-shadow-rgb when the light ink colour is not hex ("r g b"). // Default: "15 23 42"
+ *     },
+ *     layouts?: array{ // Layouts the page scaffolds extend (Twig global nowo_ui_layout). Host layouts or one-file bridges must render the canonical nowo_ui_* blocks.
+ *         admin?: scalar|Param|null, // Default: "@NowoUiKit/layout/admin.html.twig"
+ *         guest?: scalar|Param|null, // Default: "@NowoUiKit/layout/guest.html.twig"
+ *     },
+ *     breadcrumbs?: array{ // Page header breadcrumbs: BreadcrumbKit (breadcrumb_render) when installed and enabled here, else the plain trail from PageHeader::breadcrumbs.
+ *         breadcrumb_kit?: bool|Param, // Use BreadcrumbKit when its breadcrumb_render() Twig function exists. // Default: true
+ *         collection?: scalar|Param|null, // BreadcrumbKit collection code (null = its default collection). PageHeader::breadcrumbCollection overrides it. // Default: null
+ *         enabled?: bool|Param, // 2.3.1: false drops the breadcrumb trail (BreadcrumbKit and PageHeader::breadcrumbs) from every page header, e.g. when the host layout renders its own. // Default: true
+ *     },
+ *     header?: array{ // 2.27 compact header: the default page-header presentation (a request attribute _nowo_ui_header_presentation overrides it per request) and where PageHeader::actions go in the compact presentation.
+ *         presentation?: "standard"|"compact"|"inline"|"no_intro"|"no_title"|"no_header"|Param, // standard (default) | compact | inline | no_intro | no_title | no_header: in compact the page header keeps a visually hidden h1 and leaves its intro, breadcrumbs and back link to the top bar (header_context); 2.39: inline puts the intro on the title row, no_intro drops the intro, no_title keeps the h1 visually hidden, no_header does both. // Default: "standard"
+ *         compact_actions?: "page"|"bar"|Param, // page (default): header.actions stay in the page header; bar: in the compact presentation the page header leaves them out (the host shows them in the top bar through the page_actions partial). extra_actions always stay. // Default: "page"
+ *     },
+ *     auth_panel?: array{ // 2.44: the auth scaffold (page/auth.html.twig) panel (Twig global nowo_ui_kit_auth_panel).
+ *         brand?: "auto"|"none"|Param, // auto (default, the 2.43 markup): the panel brand region prints the appearance logo lockup, else AuthPage::brand as text; none: the panel prints no brand region (a host guest layout that prints its own brand). A render variable nowo_ui_auth_brand (auto | none) wins over it. // Default: "auto"
+ *     },
+ *     remote_dialog?: array{ // 2.28 remote form dialog (X-Nowo-Dialog requests).
+ *         convert_redirects?: bool|Param, // Turn a RedirectResponse answered to a dialog request (X-Nowo-Dialog: 1, main request) into 204 + X-Nowo-Redirect when its Location is a same-origin path, so redirectToRoute() controllers work in the dialog without code changes. // Default: false
+ *         step_routes?: list<scalar|Param|null>,
+ *         request_header?: scalar|Param|null, // 2.33: request header the dialog sends with "1" (both drivers, RemoteDialogResponder, the redirect listener, nowo_ui_dialog_request()). // Default: "X-Nowo-Dialog"
+ *         redirect_header?: scalar|Param|null, // 2.33: response header of the success answer (204 + <path>: the dialog closes and the page goes there). // Default: "X-Nowo-Redirect"
+ *         location_header?: scalar|Param|null, // 2.33: response header of the step answer (204 + <path>: the dialog stays open and loads the next step). // Default: "X-Nowo-Dialog-Location"
+ *     },
+ *     theme?: array{ // Global theme (REQ-UI-003): semantic slot classes / attributes, partial overrides and --nowo-ui-* tokens, configured once for every bundle.
+ *         framework_defaults?: bool|Param, // false = slots print the semantic nowo-ui-* class and the host classes only (no UiKit framework defaults such as btn / badge / card). Per slot: classes.<slot>: {value: …, framework_defaults: false}. // Default: true
+ *         classes?: array<string, mixed>,
+ *         attributes?: array<string, array<string, mixed>>,
+ *         partials?: array<string, scalar|Param|null>,
+ *         tokens?: array<string, mixed>,
+ *         tokens_dark?: array<string, mixed>,
+ *         confirm_message_in_header?: bool|Param, // Confirm dialogs and the full-page confirm render the message inside the header, under the title (hosts whose dialog header is title + message). View\Confirm::messageInHeader wins when set. // Default: false
+ *         popover_menus?: bool|Param, // 2.4: menu / kebab / row-action menus render their panel as a native [popover] (browser top layer: never clipped by table scrollers or cards; nowo-ui-popover.js places it). The partial option `popover` wins. // Default: false
+ *         form_errors_after_widget?: bool|Param, // 2.10: the UiKit form theme (form/nowo_ui_layout.html.twig) prints a field's errors after its widget (and before the help), instead of Symfony's order (label, errors, widget, help). // Default: false
+ *         menu_semantics?: null|"menu"|"disclosure"|Param, // 2.28: ARIA of popover menus with items. null (default) = as 2.27; menu = APG menu button (role="menu" / menuitem, arrow keys in nowo-ui-popover.js); disclosure = no aria-haspopup. The menu partial option `menu_semantics` wins. // Default: null
+ *         dialog?: array{ // 2.31: kit dialog options (docs/THEMING.md#dialog-sizes-229).
+ *             height?: "content"|"size"|Param, // 2.31: content (default, dialog rule v2) = a dialog is as tall as its content, capped at min(the size's height token, 100dvh - 2rem), only the body scrolls; size = every dialog with a field, list, table or fold has the size's height (2.29 / 2.30), printed as --nowo-ui-dialog-fill: 1 by nowo_ui_theme_css(). // Default: "content"
+ *         },
+ *         bundles?: array<string, array{ // Default: []
+ *             framework_defaults?: bool|Param, // Override of theme.framework_defaults for this bundle (unset = inherit).
+ *             classes?: array<string, mixed>,
+ *             attributes?: array<string, array<string, mixed>>,
+ *             partials?: array<string, scalar|Param|null>,
+ *             tokens?: array<string, mixed>,
+ *             tokens_dark?: array<string, mixed>,
+ *             pages?: array<string, array{ // Default: []
+ *                 framework_defaults?: bool|Param, // Override of theme.framework_defaults for this page type (unset = inherit).
+ *                 classes?: array<string, mixed>,
+ *                 attributes?: array<string, array<string, mixed>>,
+ *             }>,
+ *         }>,
+ *         pages?: array<string, array{ // Default: []
+ *             framework_defaults?: bool|Param, // Override of theme.framework_defaults for this page type (unset = inherit).
+ *             classes?: array<string, mixed>,
+ *             attributes?: array<string, array<string, mixed>>,
+ *             header_actions_in_filters?: bool|Param, // list only: render the page-header actions at the end of the filter row instead of the page header (ListPage::headerActionsInFilters wins when set; unset = false).
+ *             filters?: array{ // list only (2.30): host options of the list scaffold filters (page/_list_filters.html.twig). Unset = the 2.29 output.
+ *                 display?: null|"text"|"icon"|"icon_text"|Param, // Default display of the apply / clear / extra filter buttons (ListPage::filtersDisplay and Action::display win; set, the plain clear link follows it too). null = the 2.29 behaviour. // Default: null
+ *                 submit_icon?: scalar|Param|null, // Icon of the apply button when it shows one (components/_icon.html.twig name; null = filter). ListPage::filtersSubmit->icon wins. // Default: null
+ *                 clear_icon?: scalar|Param|null, // Icon of the plain clear link (ListPage::filtersClearHref) when it shows one (null = filter_off). // Default: null
+ *                 submit_class?: scalar|Param|null, // Host classes of the apply button, replacing its btn_<variant> slot classes (nowo-ui-filters__submit and, icon-only, the btn_icon slot stay). null = the slot classes. // Default: null
+ *                 clear_class?: scalar|Param|null, // Host classes of the clear button (plain link or ListPage::filtersClear Action), replacing its btn_<variant> slot classes. null = the slot classes. // Default: null
+ *                 grid?: scalar|Param|null, // Grid tracks of the filter fields: auto-fit (default: a lone filter stretches across the card), auto-fill (empty tracks keep their width) or a grid-template-columns track list such as "repeat(auto-fill, minmax(min(100%, 13rem), 1fr))" (printed as the --nowo-ui-filters-grid-columns token by nowo_ui_tokens(); no inline style). // Default: "auto-fit"
+ *                 fold?: array{ // Fold toggle of the filters card (partials/_filters_collapse.html.twig, Stimulus peer filters-collapse). ListPage::filtersFold wins.
+ *                     enabled?: bool|Param, // Render the fold toggle (the card renders open unless the cookie remembers it folded). // Default: false
+ *                     cookie?: scalar|Param|null, // Cookie remembering the folded pages (comma-separated page keys; SameSite=Lax, no secrets). // Default: "nowo_ui_filters_collapsed"
+ *                     cookie_path?: scalar|Param|null, // Path of that cookie. // Default: "/"
+ *                     icons?: array{
+ *                         expanded?: scalar|Param|null, // Icon while the card is open. // Default: "chevron_up"
+ *                         collapsed?: scalar|Param|null, // Icon while the card is folded. // Default: "chevron_down"
+ *                     },
+ *                     testids?: bool|Param, // data-testid filters-collapse-toggle / filters-collapse-summary. // Default: false
+ *                     morph?: bool|Param, // Add the <morph-icon> of assets/morphicons to the toggle. // Default: false
+ *                 },
+ *             },
+ *         }>,
+ *     },
+ *     error_pages?: array{ // Kit error pages (2.6): templates/bundles/TwigBundle/Exception/error.html.twig = {% extends '@NowoUiKit/error/status.html.twig' %}.
+ *         layout_template?: scalar|Param|null, // Document the status template extends: the kit layout, or a host template extending it (own <head> assets, brand, chat dock…). // Default: "@NowoUiKit/error/layout.html.twig"
+ *         translation_domain?: scalar|Param|null, // Domain of the page texts (e.g. messages). Keys missing there fall back to UiKit's own NowoUiKitBundle error.* texts. // Default: "NowoUiKitBundle"
+ *         translation_prefix?: scalar|Param|null, // Key prefix: <prefix>.<code>.title|lead|hint|image_alt, <prefix>.generic.*, <prefix>.home|retry|back|retry_after|auto_retry|skip_to_content. // Default: "error"
+ *         home_path?: scalar|Param|null, // Href of the "Back to home" button. // Default: "/"
+ *         illustrations?: array<string, Param|string|array{ // Default: []
+ *             path?: scalar|Param|null,
+ *             width?: int|Param, // Default: null
+ *             height?: int|Param, // Default: null
+ *             webp?: bool|Param|null, // Default: null
+ *             extension?: scalar|Param|null, // Default: null
+ *         }>,
+ *         illustration_width?: int|Param, // Default intrinsic width of the illustrations. // Default: 1024
+ *         illustration_height?: int|Param, // Default intrinsic height of the illustrations. // Default: 683
+ *         illustration_provider?: scalar|Param|null, // 2.47: service id implementing Nowo\UiKitBundle\View\ErrorIllustrationProviderInterface, asked first per status code (null answer, any exception or an invalid illustration → the illustrations map). Must be fast and must not need the database. Null = the map only. // Default: null
+ *         illustration_provider_budget_ms?: int|Param, // 2.47: when > 0, a provider call slower than this many milliseconds makes the rest of the same request skip the provider (logged once). 0 = no budget. // Default: 0
+ *         webp?: bool|Param, // Illustrations ship a .webp next to the fallback image (<source type="image/webp">). // Default: true
+ *         retry_statuses?: list<int|Param>,
+ *         back_link_statuses?: list<int|Param>,
+ *         auto_retry_seconds?: int|Param, // A 5xx on GET reloads itself after this many seconds (REQ-ERROR-001 item 10; 0 = never). Never on POST. // Default: 600
+ *         theme_storage?: scalar|Param|null, // localStorage key of the theme (data-nowo-ui-theme-storage on <html> and the toggle), e.g. the host's beacon-theme. // Default: "nowo-ui-theme"
+ *         theme_toggle?: bool|Param, // Render the light / dark toggle in the top controls. // Default: true
+ *         html_attributes?: array<string, mixed>,
+ *     },
+ *     shell?: array{ // Signed-in app shell (2.6, @NowoUiKit/shell/_open|_close|_shell|_burger.html.twig; Twig global nowo_ui_kit_shell).
+ *         kit_styles?: bool|Param, // Add the kit shell classes (nowo-ui-shell, nowo-ui-header, nowo-ui-aside…) painted by nowo-ui.css and driven by nowo-ui-shell.js. false: only the app_* slot classes (host shell CSS / JS). // Default: true
+ *         sidebar_cookie?: scalar|Param|null, // Cookie holding the desktop aside mode (e.g. beacon_sidebar), read server-side so the first paint is already collapsed / rail; null = expanded unless the template passes collapsed. // Default: null
+ *         sidebar_hidden_value?: scalar|Param|null, // Cookie value of the hidden aside. // Default: "collapsed"
+ *         sidebar_rail_value?: scalar|Param|null, // Cookie value of the icons-only rail. // Default: "rail"
+ *         sidebar_storage?: scalar|Param|null, // localStorage key of the aside mode (data-nowo-ui-sidebar-storage on the shell root; kit_styles + rail only). // Default: null
+ *         sidebar_layout?: "below-header"|"full-height"|Param, // 2.32: below-header (default, the 2.31 markup byte for byte) | full-height: on desktop the aside runs from the top edge with the burger and the brand in its head (aside_brand_html / brand_icon_html + brand_name / brand_html), the header and the footer start at its right edge. The app_shell_open option sidebar_layout, then the request attribute _nowo_ui_sidebar_layout, win over it. // Default: "below-header"
+ *         sidebar_style?: "classic"|"inset"|Param, // 2.52: classic (default, the 2.51 markup byte for byte) | inset: on desktop the header, the aside and the footer share one shell surface with no border between them, and the content is an inset panel with rounded corners (tokens --nowo-ui-shell-inset-gap / -radius / -surface / -panel-surface). Phones are unchanged. The app_shell_open option sidebar_style, then the request attribute _nowo_ui_sidebar_style, win over it. // Default: "classic"
+ *         brand?: array{ // 2.32: the shell brand from config (no template override): the aside head of the full-height layout, and the header brand when a page passes neither brand_html nor brand. The app_shell_open options brand_name / brand_href / brand_icon_src / brand_icon_html / aside_brand_html win.
+ *             name?: scalar|Param|null, // Brand name (text); the icons-only rail hides it and keeps it as the link name. // Default: null
+ *             href?: scalar|Param|null, // Brand link: relative, http, https or mailto (validated when the container compiles; javascript:, data: and other schemes are refused). // Default: null
+ *             icon_src?: scalar|Param|null, // Brand icon image URL (e.g. /images/logo.svg; prefer same-origin or https), rendered as <img> in every aside mode; without it the name's initial. Relative, http or https only (validated when the container compiles). // Default: null
+ *         },
+ *         hover_expand?: bool|Param, // 2.32: with kit_styles and rail_mode, the icons-only rail widens over the page while the pointer or the keyboard focus is on it (data-nowo-ui-sidebar-hover-expand on the shell root, is-aside-peek set by nowo-ui-shell.js). The app_shell_open option hover_expand wins. // Default: false
+ *     },
+ * }
+ * @psalm-type DebugConfig = array{
+ *     max_items?: int|Param, // Max number of displayed items past the first level, -1 means no limit. // Default: 2500
+ *     min_depth?: int|Param, // Minimum tree depth to clone all the items, 1 is default. // Default: 1
+ *     max_string_length?: int|Param, // Max length of displayed strings, -1 means no limit. // Default: -1
+ *     dump_destination?: scalar|Param|null, // A stream URL where dumps should be written to. // Default: null
+ *     theme?: "dark"|"light"|Param, // Changes the color of the dump() output when rendered directly on the templating. "dark" (default) or "light". // Default: "dark"
+ * }
+ * @psalm-type WebProfilerConfig = array{
+ *     toolbar?: bool|array{ // Profiler toolbar configuration
+ *         enabled?: bool|Param, // Default: false
+ *         ajax_replace?: bool|Param, // Replace toolbar on AJAX requests // Default: false
+ *     },
+ *     intercept_redirects?: bool|Param, // Default: false
+ *     excluded_ajax_paths?: scalar|Param|null, // Default: "^/((index|app(_[\\w]+)?)\\.php/)?_wdt"
+ * }
+ * @psalm-type NowoHotReloadConfig = array{
+ *     enabled?: bool|Param, // Master switch. When false, nothing is injected even if FRANKENPHP_HOT_RELOAD is set. // Default: true
+ *     auto_inject?: bool|Param, // When true, HotReloadResponseSubscriber injects assets into HTML responses. // Default: true
+ *     ignore_path_prefixes?: list<scalar|Param|null>,
+ *     client_mode?: "cdn"|"visibility"|"shared_worker"|"always"|Param, // Browser Mercure client strategy: cdn (default ESM), visibility (SSE while tab visible), shared_worker (one SSE for all tabs), always (SSE per tab). // Default: "cdn"
+ *     require_frankenphp_env?: bool|Param, // When true (default), inject only if FRANKENPHP_HOT_RELOAD is set or mercure_url is configured. // Default: true
+ *     allow_production?: bool|Param, // When false (default), enabling this bundle in the prod environment raises InvalidConfigurationException. // Default: false
+ *     mercure_url?: scalar|Param|null, // Optional Mercure hub URL. When null, uses $_SERVER['FRANKENPHP_HOT_RELOAD'] when present. // Default: null
+ *     idiomorph?: bool|Param, // When true, include Idiomorph for DOM morphing instead of a full page reload. // Default: true
+ *     idiomorph_script_url?: scalar|Param|null, // URL of the Idiomorph script (classic script tag). Prefer a version-pinned CDN URL. // Default: "https://cdn.jsdelivr.net/npm/idiomorph@0.7.4"
+ *     hot_reload_script_url?: scalar|Param|null, // URL of the frankenphp-hot-reload ESM module. Prefer a version-pinned CDN URL. // Default: "https://cdn.jsdelivr.net/npm/frankenphp-hot-reload@1.0.1/+esm"
+ *     preserve_selectors?: list<scalar|Param|null>,
+ *     preserve_observe?: bool|Param, // When true, the preserve boot script also uses MutationObserver for late-injected toolbar nodes. // Default: true
+ *     csp_nonce_request_attribute?: scalar|Param|null, // Request attribute name that holds the CSP nonce (e.g. "_csp_nonce"). Applied to the inline preserve boot script. // Default: null
+ *     csp_augment_script_src?: bool|Param, // When true, append CDN hosts to an existing Content-Security-Policy script-src on the response after injection. // Default: true
+ *     csp_script_src_hosts?: list<scalar|Param|null>,
+ * }
+ * @psalm-type NowoTwigInspectorConfig = array{
+ *     enabled_extensions?: list<scalar|Param|null>,
+ *     excluded_templates?: list<scalar|Param|null>,
+ *     excluded_blocks?: list<scalar|Param|null>,
+ *     enable_metrics?: bool|Param, // Enable collection of template usage metrics in DataCollector // Default: true
+ *     inject_on_sub_requests?: bool|Param, // When true, inject comments also during sub-requests (e.g. when main content is rendered as fragment). Enable if all templates show "sub-request" and none get inspected. // Default: false
+ *     cookie_name?: scalar|Param|null, // Name of the cookie used to enable/disable the inspector // Default: "twig_inspector_is_active"
+ *     max_injection_depth?: int|Param, // Maximum nesting depth for comment injection (0 = unlimited). Reduces overhead on very deep template trees. // Default: 0
+ *     excluded_templates_regex?: list<scalar|Param|null>,
+ *     excluded_templates_prefixes?: list<scalar|Param|null>,
+ *     excluded_blocks_regex?: list<scalar|Param|null>,
+ *     overlay_theme?: scalar|Param|null, // Overlay theme: "light", "dark", or "auto" (follow system preference). // Default: "light"
+ *     overlay_compact?: bool|Param, // Use compact tooltip style for the overlay. // Default: false
+ *     reduced_motion?: bool|Param, // Respect reduced motion (accessibility). When true or system prefers-reduced-motion, animations are minimized. // Default: false
+ *     keyboard_shortcut?: scalar|Param|null, // Keyboard shortcut to toggle inspector (e.g. "Ctrl+Shift+T"). Empty to disable. // Default: "Ctrl+Shift+T"
+ * }
  * @psalm-type ConfigType = array{
  *     imports?: ImportsConfig,
  *     parameters?: ParametersConfig,
@@ -1136,6 +1382,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     twig?: TwigConfig,
  *     twig_extra?: TwigExtraConfig,
  *     nowo_notify_kit?: NowoNotifyKitConfig,
+ *     nowo_ui_kit?: NowoUiKitConfig,
  *     "when@dev"?: array{
  *         imports?: ImportsConfig,
  *         parameters?: ParametersConfig,
@@ -1145,6 +1392,11 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         twig?: TwigConfig,
  *         twig_extra?: TwigExtraConfig,
  *         nowo_notify_kit?: NowoNotifyKitConfig,
+ *         nowo_ui_kit?: NowoUiKitConfig,
+ *         debug?: DebugConfig,
+ *         web_profiler?: WebProfilerConfig,
+ *         nowo_hot_reload?: NowoHotReloadConfig,
+ *         nowo_twig_inspector?: NowoTwigInspectorConfig,
  *     },
  *     "when@prod"?: array{
  *         imports?: ImportsConfig,
@@ -1155,6 +1407,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         twig?: TwigConfig,
  *         twig_extra?: TwigExtraConfig,
  *         nowo_notify_kit?: NowoNotifyKitConfig,
+ *         nowo_ui_kit?: NowoUiKitConfig,
  *     },
  *     "when@test"?: array{
  *         imports?: ImportsConfig,
@@ -1165,6 +1418,10 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         twig?: TwigConfig,
  *         twig_extra?: TwigExtraConfig,
  *         nowo_notify_kit?: NowoNotifyKitConfig,
+ *         nowo_ui_kit?: NowoUiKitConfig,
+ *         web_profiler?: WebProfilerConfig,
+ *         nowo_hot_reload?: NowoHotReloadConfig,
+ *         nowo_twig_inspector?: NowoTwigInspectorConfig,
  *     },
  *     ...<string, ExtensionType|array{ // extra keys must follow the when@%env% pattern or match an extension alias
  *         imports?: ImportsConfig,
