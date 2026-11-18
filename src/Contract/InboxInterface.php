@@ -16,7 +16,8 @@ interface InboxInterface
      * Deletes every inbox row of a context (no foreign key: the host calls it when a project or board is deleted,
      * contract Q-B6).
      *
-     * @throws TransientStorageFailure a deadlock, lock wait timeout or serialization failure; retry
+     * @throws TransientStorageFailure a deadlock, lock wait timeout or serialization failure (answer 409 +
+     *                                 CONFLICT_001, or retry); the chunks already deleted stay deleted
      *
      * @return int rows deleted
      */

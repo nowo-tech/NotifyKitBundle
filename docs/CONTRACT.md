@@ -325,6 +325,8 @@ context the recipient can no longer open even before the host calls `forgetConte
 - **Events** (§6.6) are dispatched after commit, carry IDs only, and are buffered per call (no service state across
   requests).
 - Dropped connections: one retry on `ConnectionLost` (DBAL 4 reconnects lazily).
+- **Contention** surfaces as `TransientStorageFailure`, answered 409 + `Retry-After` + `CONFLICT_001` (503 as a host
+  option; 0.2.0, REQ-RUNTIME-003 rule 6). Write paths, codes and residual risks: [CONCURRENCY.md](CONCURRENCY.md).
 
 ### 5.4 Schema and migrations (`REQ-ORM-001` rule 5)
 

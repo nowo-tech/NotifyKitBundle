@@ -72,7 +72,7 @@ sets `doctrine.transaction_runner` to a retrying adapter.
 | §4.2 `InboxInterface` | S1 ships `forgetContext()` only; unread count, pages and row operations come with the visibility re-check in S2 | No read API without read-time visibility |
 | §6.1 write-time access (listed under S2 in §13) | In S1, with `PersonalOnlyAccessChecker` as the default | A 0.1.0 must not write context rows without the access check |
 | §3 / §6.1 a type without permission and a context | Refused (deny by default; owner 2026-11-15) | The contract leaves the case open; Beacon gives every project type a permission |
-| §4.2 failures of `notify()` | `TransientStorageFailure` propagates (503 + Retry-After at the edge); retry only through `doctrine.transaction_runner` (owner 2026-11-15) | No silent loss of a notification; no hidden retries of a committed producer request |
+| §4.2 failures of `notify()` | `TransientStorageFailure` propagates (409 + Retry-After + `CONFLICT_001` at the edge since 0.2.0; 503 was the 0.1 answer); retry only through `doctrine.transaction_runner` (owner 2026-11-15) | No silent loss of a notification; no hidden retries of a committed producer request |
 
 ## Audit QL (2026-11-15, PR #2) — fixed in S1
 

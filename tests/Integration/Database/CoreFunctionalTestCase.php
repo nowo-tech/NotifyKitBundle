@@ -43,7 +43,7 @@ use function strlen;
 
 /**
  * The S1 functional suite, run once per host kind (standard and DDD) on the configured database (SQLite locally and
- * in the coverage job; MySQL 8.4 and PostgreSQL 17 on DBAL 3 and 4 in the CI database jobs).
+ * in the coverage job; MySQL 8.4, MariaDB 11.4 and PostgreSQL 16 on DBAL 3 and 4 in the CI database jobs).
  */
 abstract class CoreFunctionalTestCase extends KernelTestCase
 {

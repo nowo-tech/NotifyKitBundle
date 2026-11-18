@@ -80,8 +80,7 @@ DDD hosts set `doctrine.auto_mapping: false` and register the bundle's XML mappi
 ### Reference DDL
 
 Generated from the mapping by `tests/Integration/Database/ReferenceDdlTest.php` (DBAL 4, ORM 3; `NOWO_PRINT_DDL=1`
-prints it), default prefix. The MySQL, PostgreSQL and SQLite blocks are checked in CI; the MariaDB block was generated
-from the same mapping with a MariaDB 11.4 platform.
+prints it), default prefix. The MySQL, MariaDB, PostgreSQL and SQLite blocks are checked in CI.
 
 MySQL 8.0.17+ / 8.4:
 
@@ -91,7 +90,7 @@ CREATE TABLE nowo_notify_notification (recipient_type VARCHAR(32) CHARACTER SET 
 CREATE TABLE nowo_notify_dedupe (expires_at DATETIME NOT NULL, key_hash VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, INDEX idx_nowo_notify_dedupe_expires (expires_at), PRIMARY KEY (key_hash)) DEFAULT CHARACTER SET utf8mb4;
 ```
 
-MariaDB 10.6+ (`utf8mb4_nopad_bin`; not in CI yet, see the 0.1.0 known issues in [CHANGELOG.md](CHANGELOG.md)):
+MariaDB 10.6+ (`utf8mb4_nopad_bin`; checked in CI on MariaDB 11.4 since 0.2.0):
 
 <!-- ddl:mariadb -->
 ```sql

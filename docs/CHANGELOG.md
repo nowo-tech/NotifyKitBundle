@@ -7,6 +7,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `docs/CONCURRENCY.md` (REQ-RUNTIME-003): write-path table, conflict codes, host options, replays, tests and residual risks.
+- CI: the Databases job also runs the Database suite on MariaDB 11.4 (DBAL 4 and DBAL 3), next to MySQL 8.4 and PostgreSQL 16 (closes the QL-D-L2 known issue); the Database suite and the reference DDL test know the MariaDB `utf8mb4_nopad_bin` collation.
+- Tests: `ConflictMappingTest` (code of every failure shape: `CONFLICT_001`, `CONFLICT_002`, unique violation and lost connection left alone; host mapper); the lock-wait load test asserts the conflict code and the `Retry-After` hint.
+
+### Changed
+
+- **Documented answer of a lock conflict (REQ-RUNTIME-003 rule 6):** `TransientStorageFailure` (deadlock, lock wait timeout, serialization failure; nothing written) is answered **409 + `Retry-After` + `CONFLICT_001`**, no longer 503; `CONFLICT_002` (409, no `Retry-After`) when your request had committed part of its work. 503 stays a host option (`nowo_transaction_doctrine.conflict_response.status`). No behaviour change in the bundle: it never answers HTTP itself, and the exception class is unchanged. See [UPGRADING](UPGRADING.md#lock-conflicts-answer-409--conflict-codes).
+- Requires `nowo-tech/transaction-doctrine` ^1.5 (was ^1.1): conflict codes, serialization failures replayed by default.
+- Contract, USAGE, ROADMAP and the PHPDoc of `NotifierInterface` / `InboxInterface` say 409 instead of 503.
+- CI PostgreSQL service is 16 (was 17).
+
 ### Tests
 
 - Compiled-kernel test (`MessengerHandlerTest`): with FrameworkBundle autoconfiguration, `PruneNotificationsHandler` (`#[AsMessageHandler]`) is tagged `messenger.message_handler` exactly once, and no handler is registered while the bundle is disabled (audit SE follow-up). No behaviour change.

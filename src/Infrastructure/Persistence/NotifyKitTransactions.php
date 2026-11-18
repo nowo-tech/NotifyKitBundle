@@ -25,7 +25,7 @@ use function sprintf;
  * the current connection; `doctrine.transaction_runner` plugs a retrying adapter that works on that connection.
  *
  * - Outside a transaction: the runner opens and commits one; a deadlock, lock wait timeout or serialization failure
- *   surfaces as {@see TransientStorageFailure} with the connection back at level 0 (answer 503 + Retry-After).
+ *   surfaces as {@see TransientStorageFailure} with the connection back at level 0 (answer 409 + Retry-After + CONFLICT_001).
  * - Inside a host transaction on the same connection: the work joins it (nested level; it disappears with a rollback)
  *   and the after-commit work waits for the outermost commit ({@see AfterCommitQueue}); a rollback, or a rollback to a
  *   savepoint that contains it, drops it. After that commit it runs at the next safe point: the next unit of work of

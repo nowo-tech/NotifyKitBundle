@@ -15,6 +15,8 @@ use Nowo\NotifyKitBundle\Tests\Integration\Kernel\Host;
 use Nowo\NotifyKitBundle\Tests\Integration\Kernel\KernelTestCase;
 use Nowo\NotifyKitBundle\Tests\Integration\Kernel\TestKernel;
 use Nowo\TransactionContract\TransientStorageFailure;
+use Nowo\TransactionDoctrine\ConflictCode;
+use Nowo\TransactionDoctrine\Symfony\Conflict\TransientFailureConflictMapper;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 use function array_key_last;
@@ -32,11 +34,11 @@ use function trim;
 use const PHP_BINARY;
 
 /**
- * Load readiness (Beacon spec 239 pattern, ChatKit 1.30 reference) on a server database (MySQL 8.4 / PostgreSQL 17,
- * DBAL 3 and 4; skipped on SQLite, which serialises writers):
+ * Load readiness (Beacon spec 239 pattern, ChatKit 1.30 reference) on a server database (MySQL 8.4 / MariaDB 11.4 /
+ * PostgreSQL 16, DBAL 3 and 4; skipped on SQLite, which serialises writers):
  *
- * - a repeat waiting on the row another session holds answers {@see TransientStorageFailure} (503 + Retry-After at an
- *   edge), leaves the connection at level 0 and writes nothing; the retry after the holder commits coalesces;
+ * - a repeat waiting on the row another session holds answers {@see TransientStorageFailure} (409 + Retry-After +
+ *   CONFLICT_001 at an edge, REQ-RUNTIME-003 rule 6; CONFLICT_002 once the host committed part of the request), leaves the connection at level 0 and writes nothing; the retry after the holder commits coalesces;
  * - concurrent writers of the same recipient and target never lose a repeat (the count is incremented in SQL on a
  *   locked row) and never fail;
  * - dedupe claims take no gap lock: two open transactions claim two fresh keys without waiting, and concurrent writers
@@ -78,6 +80,8 @@ final class LoadReadinessTest extends KernelTestCase
             self::fail('the waiter must time out');
         } catch (TransientStorageFailure $failure) {
             self::assertSame(1, $failure->retryAfterSeconds());
+            self::assertSame(ConflictCode::RetrySafe, ConflictCode::forFailure($failure), 'nothing was committed: CONFLICT_001 with Retry-After');
+            self::assertTrue((new TransientFailureConflictMapper())->isConflict($failure));
         }
         self::assertSame(0, $waiting->getTransactionNestingLevel(), 'no transaction is left open in the worker');
 

@@ -14,6 +14,7 @@ use Nowo\NotifyKitBundle\Domain\DedupeMarker;
 use Nowo\NotifyKitBundle\Domain\Notification;
 use Nowo\NotifyKitBundle\Infrastructure\Doctrine\Entity\DedupeRecord;
 use Nowo\NotifyKitBundle\Infrastructure\Doctrine\Entity\NotificationRecord;
+use Nowo\NotifyKitBundle\Infrastructure\Doctrine\NotifyKitMetadataListener;
 use Nowo\NotifyKitBundle\Infrastructure\Schema\SchemaChecker;
 use Nowo\NotifyKitBundle\Tests\Integration\Kernel\Host;
 use Nowo\NotifyKitBundle\Tests\Integration\Kernel\KernelTestCase;
@@ -29,7 +30,7 @@ use function strtolower;
  */
 final class SchemaTest extends KernelTestCase
 {
-    private bool $platformIsMySql = false;
+    private ?string $binaryCollation = null;
 
     public function testXmlAndAttributeMappingsGiveTheSameTables(): void
     {
@@ -53,10 +54,10 @@ final class SchemaTest extends KernelTestCase
         $table = $this->table(['doctrine' => ['table_prefix' => '']], Notification::class);
         self::assertSame('notify_notification', $table->getName());
 
-        // MySQL 8.4 in CI: binary NO PAD, so '42' and '42 ' differ (audit QL-M3).
+        // MySQL 8.4 (utf8mb4_0900_bin) and MariaDB 11.4 (utf8mb4_nopad_bin) in CI: binary NO PAD, so '42' and '42 ' differ (audit QL-M3).
         foreach (['id', 'recipient_type', 'recipient_id', 'type', 'category', 'actor_type', 'actor_id', 'context_type', 'context_id', 'target'] as $column) {
             $actual = $table->getColumn($column)->getPlatformOptions()['collation'] ?? null;
-            self::assertSame($this->platformIsMySql ? 'utf8mb4_0900_bin' : null, $actual, $column . ': PostgreSQL and SQLite compare exactly by default');
+            self::assertSame($this->binaryCollation, $actual, $column . ': PostgreSQL and SQLite compare exactly by default');
         }
         self::assertNull($table->getColumn('url')->getPlatformOptions()['collation'] ?? null, 'the URL is not an identifier');
     }
@@ -87,7 +88,8 @@ final class SchemaTest extends KernelTestCase
         self::assertInstanceOf(ManagerRegistry::class, $doctrine);
         $em = $doctrine->getManager();
         self::assertInstanceOf(EntityManagerInterface::class, $em);
-        $this->platformIsMySql = $em->getConnection()->getDatabasePlatform() instanceof AbstractMySQLPlatform;
+        $platform              = $em->getConnection()->getDatabasePlatform();
+        $this->binaryCollation = $platform instanceof AbstractMySQLPlatform ? NotifyKitMetadataListener::collation($platform) : null;
         foreach ((new SchemaTool($em))->getSchemaFromMetadata([$em->getClassMetadata($class)])->getTables() as $table) {
             return $table;
         }
