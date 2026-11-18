@@ -26,7 +26,7 @@ EntityManager.
 ## Features
 
 Available in S1: the entry point, the in-app rows (coalescing, dedupe, write-time access), the type registry,
-retention, the schema check, transaction-safe writes (503-ready transient failures). Planned (see the roadmap): the rest.
+retention, the schema check, transaction-safe writes (transient failures ready for a 409 + `CONFLICT_001` answer). Planned (see the roadmap): the rest.
 
 - **One entry point**, `NotifierInterface::notify()`: type, recipients (by id), actor, context, target, local URL,
   params, urgency, *involved* people; validated, written after your commit, fanned out per recipient and channel.

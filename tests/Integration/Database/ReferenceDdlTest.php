@@ -6,6 +6,7 @@ namespace Nowo\NotifyKitBundle\Tests\Integration\Database;
 
 use Composer\InstalledVersions;
 use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
+use Doctrine\DBAL\Platforms\MariaDBPlatform;
 use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
@@ -29,7 +30,7 @@ use const STDERR;
 
 /**
  * The reference DDL of docs/INSTALLATION.md is what the mapping generates (contract §5.4), checked on the database of
- * the run: SQLite locally, MySQL 8.4 and PostgreSQL 17 in the CI database jobs. On DBAL 4 the block must match exactly;
+ * the run: SQLite locally, MySQL 8.4, MariaDB 11.4 and PostgreSQL 16 in the CI database jobs. On DBAL 4 the block must match exactly;
  * DBAL 3 formats some statements differently, so there every documented table and index name must appear.
  * `NOWO_PRINT_DDL=1` prints the block to paste.
  */
@@ -45,6 +46,7 @@ final class ReferenceDdlTest extends KernelTestCase
         self::assertInstanceOf(EntityManagerInterface::class, $em);
         $platform = $em->getConnection()->getDatabasePlatform();
         $name     = match (true) {
+            $platform instanceof MariaDBPlatform       => 'mariadb',
             $platform instanceof AbstractMySQLPlatform => 'mysql',
             $platform instanceof PostgreSQLPlatform    => 'postgresql',
             default                                    => 'sqlite',

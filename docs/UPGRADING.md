@@ -3,10 +3,34 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+  - [Lock conflicts answer 409 + CONFLICT codes](#lock-conflicts-answer-409--conflict-codes)
 - [To 0.1.1](#to-011)
 - [To 0.1.0](#to-010)
 
 ## Unreleased
+
+### Lock conflicts answer 409 + CONFLICT codes
+
+```bash
+composer update nowo-tech/notify-kit-bundle nowo-tech/transaction-doctrine
+```
+
+`nowo-tech/transaction-doctrine` ^1.5 is required (was ^1.1). No migration, no configuration change.
+
+The bundle has no HTTP layer, so nothing changes in what it throws: a deadlock, lock wait timeout or serialization
+failure is still a `Nowo\TransactionContract\TransientStorageFailure` with nothing written. What changes is the answer
+the documentation tells you to give (REQ-RUNTIME-003 rule 6, see [CONCURRENCY](CONCURRENCY.md)):
+
+| Failure | 0.1 | Now |
+| --- | --- | --- |
+| Lock conflict, nothing committed | 503 + `Retry-After` | **409** + `Retry-After`, code `CONFLICT_001` |
+| Same, after an earlier write unit of your request committed | 503 + `Retry-After` | **409**, no `Retry-After`, code `CONFLICT_002` |
+| Unique violation, lost connection | not mapped | not mapped |
+
+- If you answered the exception yourself, switch the status and add the `code`. Clients that retried on 503 should
+  retry on 409 with `CONFLICT_001` and reload, not retry, on `CONFLICT_002`.
+- If you use nowo-tech/transaction-doctrine's Symfony bundle, `conflict_response.map_transient_failures: true` answers it
+  for you (JSON or HTML, with the code in the body). `conflict_response.status: 503` keeps 503 for the whole application.
 
 ## To 0.1.1
 

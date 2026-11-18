@@ -96,7 +96,9 @@ foreign key (Q-B6). From S2 the inbox also hides rows whose context the recipien
   **at the latest** (never inside the driver commit, so listeners may open transactions, flush or call `notify()`).
   Rows written inside your transaction keep their row locks until your commit.
 - A deadlock, lock wait timeout or serialization failure surfaces as `Nowo\TransactionContract\TransientStorageFailure`
-  with nothing written: answer **503 with `Retry-After`** (`$e->retryAfterSeconds()`), or retry. To retry inside the
+  with nothing written: answer **409 with `Retry-After` and code `CONFLICT_001`** (`$e->retryAfterSeconds()`; 503 stays a
+  host option), or retry. With nowo-tech/transaction-doctrine's Symfony bundle, `conflict_response.map_transient_failures: true`
+  does that for you ([CONCURRENCY.md](CONCURRENCY.md)). To retry inside the
   bundle, set `doctrine.transaction_runner` to a retrying adapter that works on the bundle connection and flushes no
   EntityManager (e.g. the connection-level adapter of `nowo-tech/doctrine-deadlock-retry-bundle` 3.x).
 - Concurrency: coalescing never takes a gap lock (it reads the candidate row, then updates it by primary key with

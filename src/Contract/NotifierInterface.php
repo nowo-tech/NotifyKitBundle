@@ -23,8 +23,8 @@ interface NotifierInterface
      * Never throws for a refused recipient: it is skipped and logged at info level.
      *
      * @throws InvalidNotificationArgumentException more recipients than `fan_out.max_recipients`
-     * @throws TransientStorageFailure a deadlock, lock wait timeout or serialization failure (answer 503 + Retry-After,
-     *                                 or retry); nothing was written
+     * @throws TransientStorageFailure a deadlock, lock wait timeout or serialization failure (answer 409 + Retry-After +
+     *                                 CONFLICT_001, or retry; docs/CONCURRENCY.md); nothing was written
      */
     public function notify(NotificationRequest $request): NotifyResult;
 }
