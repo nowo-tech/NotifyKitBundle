@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-18
+
 ### Added
 
 - `docs/CONCURRENCY.md` (REQ-RUNTIME-003): write-path table, conflict codes, host options, replays, tests and residual risks.
@@ -23,6 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Tests
 
 - Compiled-kernel test (`MessengerHandlerTest`): with FrameworkBundle autoconfiguration, `PruneNotificationsHandler` (`#[AsMessageHandler]`) is tagged `messenger.message_handler` exactly once, and no handler is registered while the bundle is disabled (audit SE follow-up). No behaviour change.
+
+[0.2.0]: https://github.com/nowo-tech/NotifyKitBundle/releases/tag/v0.2.0
 
 ## [0.1.1] - 2026-11-17
 
@@ -98,5 +102,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   every MySQL dedupe claim look successful, so a duplicate notice can get through (fails open: no leak). Leave it off on
   that connection.
 
-[Unreleased]: https://github.com/nowo-tech/NotifyKitBundle/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/nowo-tech/NotifyKitBundle/compare/v0.2.0...HEAD
 [0.1.0]: https://github.com/nowo-tech/NotifyKitBundle/releases/tag/v0.1.0
