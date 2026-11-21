@@ -1,3 +1,8 @@
-# REQ-DEMO-014: UiKit's default theme, unchanged (no theme tokens, no CSS framework, no CDN).
+# REQ-DEMO-014: UiKit's default theme, unchanged (no theme tokens, no CSS framework, no CDN). The demo platform shell
+# (templates/base.html.twig) is the admin and guest layout.
 nowo_ui_kit:
     css_framework: custom
+    base_stylesheet: true
+    layouts:
+        admin: 'base.html.twig'
+        guest: 'base.html.twig'
