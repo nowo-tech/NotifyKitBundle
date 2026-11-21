@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /**
- * REQ-DEMO-013 — full demo frame: demo masthead + the bundle status table + Symfony WebProfiler toolbar.
+ * REQ-DEMO-013 — the demo platform shell with the bundle status table (no Symfony WebProfiler toolbar).
  */
 const outDir = process.env.SCREENSHOT_DIR
   ? resolve(process.env.SCREENSHOT_DIR)
@@ -21,13 +21,12 @@ async function boxOf(page: Page, selector: string): Promise<Box | null> {
 }
 
 async function clipDemoFrame(page: Page): Promise<Box> {
-  const masthead = await boxOf(page, '[data-testid="demo-masthead"]');
+  const shell = await boxOf(page, '[data-testid="demo-platform"]');
   const main = await boxOf(page, 'main');
-  const profiler = (await boxOf(page, '.sf-toolbar')) ?? (await boxOf(page, '.sf-minitoolbar'));
-  if (!masthead || !main) {
-    throw new Error('Missing demo masthead or main for the NotifyKit screenshot clip');
+  if (!shell || !main) {
+    throw new Error('Missing demo platform shell or main for the NotifyKit screenshot clip');
   }
-  const boxes = [masthead, main, profiler].filter(Boolean) as Box[];
+  const boxes = [shell, main] as Box[];
   const x = Math.min(...boxes.map((b) => b.x));
   const y = Math.min(...boxes.map((b) => b.y));
   const right = Math.max(...boxes.map((b) => b.x + b.width));
@@ -50,10 +49,7 @@ test('overview — bundle wiring on the UiKit shell', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('[data-testid="demo-status"]')).toBeVisible();
   await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
-  await page
-    .locator('.sf-toolbar .sf-toolbar-block, .sf-toolbar-status, .sf-minitoolbar')
-    .first()
-    .waitFor({ state: 'visible', timeout: 10000 })
-    .catch(() => {});
+  // The Symfony toolbar is not part of the demo platform: README screenshots never show it.
+  await page.addStyleTag({ content: '.sf-toolbar,.sf-minitoolbar,[id^="sfwdt"]{display:none!important}' });
   await page.screenshot({ path: resolve(outDir, 'overview.png'), clip: await clipDemoFrame(page) });
 });

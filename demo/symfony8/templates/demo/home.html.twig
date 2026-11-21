@@ -1,21 +1,24 @@
 {% extends 'base.html.twig' %}
 
+{% block nowo_ui_page_header %}
+    {{ include(nowo_ui_partial('page_header'), {
+        title: 'Notify Kit Bundle',
+        intro: 'Notifications for Symfony: one notify() call, an in-app inbox with a real-time badge, per-person preferences by category and channel, quiet hours and digests, mail / push / Slack channels and GDPR export and erasure.',
+    }) }}
+{% endblock %}
+
 {% block body %}
-    <h1>Notify Kit Bundle <span class="nowo-ui-badge nowo-ui-badge--neutral">S0 scaffold</span></h1>
-    <p>Notifications for Symfony: one notify() call, an in-app inbox with a real-time badge, per-person preferences by category and channel, quiet hours and digests, mail / push / Slack channels and GDPR export and erasure.</p>
-    <p class="nowo-ui-muted">
-        The package is built slice by slice from its design contract. S0 ships the bundle class and its strict
-        configuration tree; the features arrive with the next slices (see <code class="nowo-ui-code">docs/ROADMAP.md</code>).
-    </p>
-    <div class="nowo-ui-table-wrap">
-        <table class="nowo-ui-table" data-testid="demo-status">
-            <tbody>
-                <tr><th scope="row">Bundle</th><td><code class="nowo-ui-code">Nowo\NotifyKitBundle\NowoNotifyKitBundle</code> registered, <code class="nowo-ui-code">nowo_notify_kit.enabled</code> = <strong>{{ enabled ? 'true' : 'false' }}</strong></td></tr>
-                <tr><th scope="row">API prefix parameter</th><td><code class="nowo-ui-code">%nowo_notify_kit.api_prefix%</code> = <code class="nowo-ui-code">{{ api_prefix }}</code></td></tr>
-                <tr><th scope="row">Table prefix</th><td><code class="nowo-ui-code">{{ table_prefix }}</code></td></tr>
-                <tr><th scope="row">Database</th><td>{{ database is null ? 'not reachable' : 'MySQL ' ~ database }}</td></tr>
-                <tr><th scope="row">FrankenPHP</th><td>{{ worker ? 'worker mode (kernel kept alive)' : 'classic mode' }}</td></tr>
-            </tbody>
-        </table>
-    </div>
+    {% embed '@NowoUiKit/demo_platform/_section.html.twig' with {title: 'Bundle status', intro: 'The package is built slice by slice from its design contract. S0 ships the bundle class and its strict configuration tree; the features arrive with the next slices (see docs/ROADMAP.md).', kind: 'table'} %}
+        {% block section_body %}
+            <table class="nowo-ui-data-table" data-testid="demo-status">
+                <tbody>
+                    <tr><th scope="row">Bundle</th><td class="nowo-ui-cell--wrap"><code class="nowo-ui-code">Nowo\NotifyKitBundle\NowoNotifyKitBundle</code> registered, <code class="nowo-ui-code">nowo_notify_kit.enabled</code> = <strong>{{ enabled ? 'true' : 'false' }}</strong></td></tr>
+                    <tr><th scope="row">API prefix parameter</th><td class="nowo-ui-cell--wrap"><code class="nowo-ui-code">%nowo_notify_kit.api_prefix%</code> = <code class="nowo-ui-code">{{ api_prefix }}</code></td></tr>
+                    <tr><th scope="row">Table prefix</th><td><code class="nowo-ui-code">{{ table_prefix }}</code></td></tr>
+                    <tr><th scope="row">Database</th><td>{{ database is null ? 'not reachable' : 'MySQL ' ~ database }}</td></tr>
+                    <tr><th scope="row">FrankenPHP</th><td>{{ worker ? 'worker mode (kernel kept alive)' : 'classic mode' }}</td></tr>
+                </tbody>
+            </table>
+        {% endblock %}
+    {% endembed %}
 {% endblock %}

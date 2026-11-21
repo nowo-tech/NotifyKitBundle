@@ -1,16 +1,14 @@
-{#- REQ-DEMO-014: the demo shell is UiKit's admin layout with UiKit's default theme (nowo-ui.css from the bundle's own
-    asset package, no CSS framework, no CDN). -#}
-{% extends '@NowoUiKit/layout/admin.html.twig' %}
-
+{#- REQ-DEMO-014: the demo runs inside UiKit's shared demo platform shell. This file only declares the demo (one status
+    page, so a single nav item). -#}
+{% extends '@NowoUiKit/demo_platform/layout.html.twig' %}
+{% set nowo_ui_demo_platform = {
+    bundle: 'Notify Kit',
+    version: 'S0 scaffold',
+    home_route: 'demo_home',
+    repository: 'https://github.com/nowo-tech/NotifyKitBundle',
+    translation_domain: false,
+    nav: [
+        {label: 'Status', route: 'demo_home', section: 'Demo'},
+    ],
+} %}
 {% block nowo_ui_document_title %}{% block title %}Notify Kit Bundle demo{% endblock %}{% endblock %}
-
-{% block nowo_ui_navigation %}
-    <header class="nowo-ui-header" data-testid="demo-masthead">
-        <a class="nowo-ui-brand" href="{{ path('demo_home') }}">Notify Kit Bundle demo</a>
-        <div class="nowo-ui-header__end">
-            {{ include('@NowoUiKitBundle/partials/_theme_toggle.html.twig', { compact: true }, false) }}
-        </div>
-    </header>
-{% endblock %}
-
-{% block nowo_ui_content %}{% block body %}{% endblock %}{% endblock %}

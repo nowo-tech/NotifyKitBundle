@@ -7,7 +7,7 @@
         "doctrine/dbal": "^4.0",
         "doctrine/doctrine-bundle": "^2.13 || ^3.0",
         "nowo-tech/notify-kit-bundle": "@dev",
-        "nowo-tech/ui-kit-bundle": "^2.53",
+        "nowo-tech/ui-kit-bundle": "^2.60",
         "php": ">=8.4,<8.6",
         "symfony/asset": "8.1.*",
         "symfony/console": "8.1.*",

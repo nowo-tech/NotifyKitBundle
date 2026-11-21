@@ -12,7 +12,7 @@ test.describe('NotifyKitBundle demo', () => {
     });
     const response = await page.goto('/');
     expect(response?.status()).toBe(200);
-    await expect(page.locator('[data-testid="demo-masthead"]')).toBeVisible();
+    await expect(page.locator('[data-testid="demo-platform"]')).toBeVisible();
     const status = page.locator('[data-testid="demo-status"]');
     await expect(status).toBeVisible();
     await expect(status).toContainText('NowoNotifyKitBundle');
