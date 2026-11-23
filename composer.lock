@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a0e05871b5613821b62ec7edded3da0f",
+    "content-hash": "0e19af9bab678d6c00582cffb9068481",
     "packages": [
         {
             "name": "doctrine/collections",
@@ -6330,16 +6330,16 @@
         },
         {
             "name": "friendsofphp/php-cs-fixer",
-            "version": "v3.95.30",
+            "version": "v3.95.32",
             "source": {
                 "type": "git",
                 "url": "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer.git",
-                "reference": "e85cafc4d861c122839d5409eda3325ac0ec0300"
+                "reference": "c12acc751f4039935429057f1fadf0e5f62601c1"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/PHP-CS-Fixer/PHP-CS-Fixer/zipball/e85cafc4d861c122839d5409eda3325ac0ec0300",
-                "reference": "e85cafc4d861c122839d5409eda3325ac0ec0300",
+                "url": "https://api.github.com/repos/PHP-CS-Fixer/PHP-CS-Fixer/zipball/c12acc751f4039935429057f1fadf0e5f62601c1",
+                "reference": "c12acc751f4039935429057f1fadf0e5f62601c1",
                 "shasum": ""
             },
             "require": {
@@ -6422,7 +6422,7 @@
             ],
             "support": {
                 "issues": "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/issues",
-                "source": "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/tree/v3.95.30"
+                "source": "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/tree/v3.95.32"
             },
             "funding": [
                 {
@@ -6430,21 +6430,21 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-11-09T14:32:19+00:00",
-            "published-time": "2026-11-09T14:32:30+00:00"
+            "time": "2026-11-17T18:09:13+00:00",
+            "published-time": "2026-11-17T18:09:33+00:00"
         },
         {
             "name": "igor-php/igor-php",
-            "version": "v0.10.1",
+            "version": "v0.11.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/igor-php/igor-php.git",
-                "reference": "a4f9153de9bae1e746a34dfb571462bcda6f4235"
+                "reference": "0ce6295d7c3546e7b8d8146a60f3ddff7a1d38a7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/igor-php/igor-php/zipball/a4f9153de9bae1e746a34dfb571462bcda6f4235",
-                "reference": "a4f9153de9bae1e746a34dfb571462bcda6f4235",
+                "url": "https://api.github.com/repos/igor-php/igor-php/zipball/0ce6295d7c3546e7b8d8146a60f3ddff7a1d38a7",
+                "reference": "0ce6295d7c3546e7b8d8146a60f3ddff7a1d38a7",
                 "shasum": ""
             },
             "require": {
@@ -6454,8 +6454,16 @@
                 "bin/igor-php"
             ],
             "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "IgorPhp\\Laravel\\IgorServiceProvider"
+                    ]
+                }
+            },
             "autoload": {
                 "psr-4": {
+                    "IgorPhp\\Laravel\\": "src/laravel/",
                     "IgorPhp\\IgorBundle\\": "src/php/"
                 }
             },
@@ -6469,20 +6477,24 @@
                     "email": "kevin.martins@me.com"
                 }
             ],
-            "description": "The faithful assistant for your FrankenPHP Workers.",
+            "description": "The faithful assistant for your FrankenPHP Workers: finds the state that leaks between requests in Symfony and Laravel Octane apps, from the CLI, PhpStorm, Claude Code or any MCP client.",
             "keywords": [
                 "frankenphp",
+                "laravel",
                 "linter",
+                "mcp",
+                "memory-leak",
+                "octane",
                 "static-analysis",
                 "symfony",
                 "worker"
             ],
             "support": {
                 "issues": "https://github.com/igor-php/igor-php/issues",
-                "source": "https://github.com/igor-php/igor-php/tree/v0.10.1"
+                "source": "https://github.com/igor-php/igor-php/tree/v0.11.0"
             },
-            "time": "2026-10-02T23:10:19+00:00",
-            "published-time": "2026-10-02T23:16:11+00:00"
+            "time": "2026-11-14T15:18:44+00:00",
+            "published-time": "2026-11-14T15:22:16+00:00"
         },
         {
             "name": "masterminds/html5",
@@ -6934,11 +6946,11 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "2.3.5",
+            "version": "2.3.7",
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/645a1bd6bead15fc1b8474137467961d0fa30a79",
-                "reference": "645a1bd6bead15fc1b8474137467961d0fa30a79",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/90c91c2498849ab8cc4e873864bbf1cb2bf6ea12",
+                "reference": "90c91c2498849ab8cc4e873864bbf1cb2bf6ea12",
                 "shasum": ""
             },
             "require": {
@@ -6994,8 +7006,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-11-03T12:14:22+00:00",
-            "published-time": "2026-11-03T12:14:36+00:00"
+            "time": "2026-11-19T10:31:11+00:00",
+            "published-time": "2026-11-19T10:31:27+00:00"
         },
         {
             "name": "phpstan/phpstan-phpunit",
