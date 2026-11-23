@@ -5,7 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Table of contents
+
+- [[Unreleased]](#unreleased)
+- [[0.3.0] - 2026-11-23](#030---2026-11-23)
+- [[0.2.0] - 2026-11-18](#020---2026-11-18)
+- [[0.1.1] - 2026-11-17](#011---2026-11-17)
+- [[0.1.0] - 2026-11-15](#010---2026-11-15)
+
 ## [Unreleased]
+
+## [0.3.0] - 2026-11-23
 
 ### Added
 
@@ -71,6 +81,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `NotificationStoreInterface` (internal) gains the read side; `countUnread()` takes an optional visibility.
 - The route loader `nowo_notify_kit` is registered even while the bundle is disabled (it then adds no route), so the
   routes import never fails.
+
+[0.3.0]: https://github.com/nowo-tech/NotifyKitBundle/releases/tag/v0.3.0
 
 ## [0.2.0] - 2026-11-18
 
@@ -167,5 +179,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   every MySQL dedupe claim look successful, so a duplicate notice can get through (fails open: no leak). Leave it off on
   that connection.
 
-[Unreleased]: https://github.com/nowo-tech/NotifyKitBundle/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/nowo-tech/NotifyKitBundle/compare/v0.3.0...HEAD
 [0.1.0]: https://github.com/nowo-tech/NotifyKitBundle/releases/tag/v0.1.0

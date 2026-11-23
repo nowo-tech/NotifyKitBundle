@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.3.0](#to-030)
   - [S2: inbox, bell and pages](#s2-inbox-bell-and-pages)
 - [To 0.2.0](#to-020)
   - [Lock conflicts answer 409 + CONFLICT codes](#lock-conflicts-answer-409--conflict-codes)
@@ -10,6 +11,14 @@
 - [To 0.1.0](#to-010)
 
 ## Unreleased
+
+## To 0.3.0
+
+From **0.2.0**:
+
+```bash
+composer update nowo-tech/notify-kit-bundle
+```
 
 ### S2: inbox, bell and pages
 
