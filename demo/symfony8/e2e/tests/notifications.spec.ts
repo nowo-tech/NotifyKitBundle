@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, withoutHotReload } from './fixtures';
+import type { Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 /**
@@ -13,7 +14,7 @@ async function signIn(page: Page, person: 'alice' | 'bob'): Promise<void> {
   }
   await page.locator(`[data-testid="demo-sign-in"] input[value="${person}"]`).check();
   await page.locator('[data-testid="demo-sign-in"] button[type="submit"], [data-testid="demo-sign-in"] [type="submit"]').first().click();
-  await expect(page.locator('[data-testid="notify-kit-bell"]')).toBeVisible();
+  await expect(page.locator('[data-testid="notify-kit-bell"]')).toBeVisible({ timeout: 15_000 });
 }
 
 async function send(page: Page, kind: 'welcome' | 'project'): Promise<void> {
@@ -65,7 +66,7 @@ test.describe('NotifyKitBundle S2: bell, inbox, live badge', () => {
     await page.locator('[data-testid="notify-kit-read-all"]').first().click();
     await expect(page.locator('[data-testid="notify-kit-read-all"]')).toHaveCount(0);
 
-    const bob = await (await browser.newContext()).newPage();
+    const bob = await (await withoutHotReload(await browser.newContext())).newPage();
     await signIn(bob, 'bob');
     await bob.goto('/notifications');
     await expect(bob.locator('body')).not.toContainText('updated project demo');
