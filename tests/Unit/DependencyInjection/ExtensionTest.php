@@ -39,7 +39,7 @@ final class ExtensionTest extends TestCase
             array_keys($container->getDefinitions()),
             static fn (string $id): bool => !str_starts_with($id, 'service_container'),
         )), 'only the route loader, which adds no route while disabled');
-        self::assertSame([false, '/notifications', false, '/admin/notifications', '%kernel.environment%'], $container->getDefinition(NotifyKitRouteLoader::class)->getArguments());
+        self::assertSame([false, '/notifications', false, '/admin/notifications', '%kernel.environment%', '/account/notifications'], $container->getDefinition(NotifyKitRouteLoader::class)->getArguments());
     }
 
     public function testEnabledRegistersTheCore(): void

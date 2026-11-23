@@ -42,7 +42,7 @@ final class TypeRegistryTest extends TestCase
         self::assertFalse($registry->has('some.new_type'));
         self::assertSame(['invitation_accepted', 'quiet.notice', 'task.assigned'], array_keys($registry->types()));
         self::assertSame(['general', 'billing', 'account', 'tasks'], array_keys($registry->categories()), 'group, order, key');
-        self::assertSame(['in_app'], $registry->channels());
+        self::assertSame(['in_app', 'mail'], $registry->channels(), 'in_app, then the channels the types name');
 
         $generic = $registry->type('some.new_type');
         self::assertSame(['general', 'notify.type.generic.title', 'project.view'], [$generic->category, $generic->titleKey, $generic->permission]);

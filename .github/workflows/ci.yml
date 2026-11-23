@@ -425,7 +425,7 @@ jobs:
       - name: Check the committed script matches the build
         run: |
           pnpm run build
-          git diff --exit-code -- src/Resources/public/js
+          git diff --exit-code -- src/Resources/public/js build-info.json
 
   demo-smoke:
     name: Demo smoke (symfony8, HTTP 200)

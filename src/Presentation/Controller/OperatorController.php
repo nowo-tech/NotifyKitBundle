@@ -6,6 +6,7 @@ namespace Nowo\NotifyKitBundle\Presentation\Controller;
 
 use DateTimeImmutable;
 use DateTimeZone;
+use Nowo\NotifyKitBundle\Application\Audit\AuditTrailInterface;
 use Nowo\NotifyKitBundle\Application\Retention\Retention;
 use Nowo\NotifyKitBundle\Contract\Message\PruneNotificationsMessage;
 use Nowo\NotifyKitBundle\Contract\Security\OperatorAccessCheckerInterface;
@@ -38,7 +39,7 @@ use function sprintf;
 /**
  * The operator page (contract §8.4): counts of the inbox (all rows, unread rows, live dedupe markers, rows written per
  * type in the last {@see self::DAYS} days), the delivery set-up and *Run retention now* (POST + CSRF
- * `nowo_notify_kit_operator`, logged). Never notification content, never a recipient. Access: the operator access
+ * `nowo_notify_kit_operator`, logged and, with the AuditKit bridge, audited). Never notification content, never a recipient. Access: the operator access
  * checker (`admin_ui.security`, `ROLE_ADMIN` by default; REQ-UI-002).
  *
  * Stateless (worker mode).
@@ -57,6 +58,7 @@ final readonly class OperatorController
     /**
      * @param string $realtime the effective realtime mode (`mercure`, `host`, `poll`, `off`)
      * @param string|null $layout `web_ui.layout_template`
+     * @param AuditTrailInterface|null $audit the audit trail (S3; AuditKit bridge): *Run retention now* is recorded
      */
     public function __construct(
         private NotificationStoreInterface $store,
@@ -72,6 +74,7 @@ final readonly class OperatorController
         private ?LoggerInterface $logger = null,
         private string $realtime = 'poll',
         private ?string $layout = null,
+        private ?AuditTrailInterface $audit = null,
     ) {
     }
 
@@ -115,6 +118,12 @@ final readonly class OperatorController
         }
         ($this->logger ?? new NullLogger())->info('nowo_notify_kit: retention run from the operator page.', [
             'operator' => $user === null ? null : $user::class,
+            'read'     => $report->read,
+            'trimmed'  => $report->trimmed,
+            'dedupe'   => $report->dedupe,
+            'complete' => !$report->remainder instanceof PruneNotificationsMessage,
+        ]);
+        $this->audit?->record(AuditTrailInterface::RETENTION_RUN, $user === null ? null : $this->current->recipientOf($user), [
             'read'     => $report->read,
             'trimmed'  => $report->trimmed,
             'dedupe'   => $report->dedupe,

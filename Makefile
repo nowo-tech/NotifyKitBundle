@@ -23,8 +23,8 @@ help:
 	@echo "  build         Rebuild Docker image (no cache)"
 	@echo "  shell         Open shell in container"
 	@echo "  install       Install Composer dependencies"
-	@echo "  assets        Build the bell script (pnpm run build: src/Resources/public/js/nowo-notify-kit-bell.js)"
-	@echo "  test-ts       Type check + Vitest with the 90 % coverage gate (bell script)"
+	@echo "  assets        Build the bell and preferences scripts (pnpm run build: src/Resources/public/js/nowo-notify-kit-*.js)"
+	@echo "  test-ts       Type check + Vitest with the 90 % coverage gate (bell and preferences scripts)"
 	@echo "  test          Run PHPUnit tests (starts container if needed)"
 	@echo "  test-coverage Run tests with code coverage (starts container if needed)"
 	@echo "  test-coverage-100 Run tests with coverage and fail below 100% (REQ-TEST-003 / REQ-TEST-006)"
@@ -186,7 +186,7 @@ composer-sync: ensure-up
 clean: ensure-up
 	$(COMPOSE) exec -T $(SERVICE_PHP) sh -c "rm -rf vendor .phpunit.cache coverage coverage.xml .php-cs-fixer.cache"
 
-# Bell script: TypeScript under src/Resources/assets, built to src/Resources/public/js (pnpm on the host; Node >= 22).
+# Bell and preferences scripts: TypeScript under src/Resources/assets, built to src/Resources/public/js (pnpm on the host; Node >= 22).
 assets:
 	pnpm install --frozen-lockfile
 	pnpm run build

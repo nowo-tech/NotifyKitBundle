@@ -6,13 +6,16 @@ namespace Nowo\NotifyKitBundle\Presentation\Routing;
 
 use Nowo\NotifyKitBundle\Presentation\Controller\InboxController;
 use Nowo\NotifyKitBundle\Presentation\Controller\OperatorController;
+use Nowo\NotifyKitBundle\Presentation\Controller\PreferencesController;
 use Symfony\Component\Config\Loader\Loader;
 use Symfony\Component\Routing\RouteCollection;
 
 /**
  * Route loader of the bundle pages (contract §7.1), type `nowo_notify_kit`: the `#[Route]` attributes of
  * {@see InboxController} under `web_ui.path_prefix` (default `/notifications`) while `web_ui.enabled`, and of
- * {@see OperatorController} under `admin_ui.path_prefix` (default `/admin/notifications`) while `admin_ui.enabled`.
+ * {@see PreferencesController} under `web_ui.preferences_path` (default `/account/notifications`, S3) while
+ * `web_ui.enabled`, and of {@see OperatorController} under `admin_ui.path_prefix` (default `/admin/notifications`) while
+ * `admin_ui.enabled`.
  * The host imports `@NowoNotifyKitBundle/Resources/config/routes.php`; with both UIs disabled (the default) or the
  * bundle disabled the import adds no route. Internal UI endpoints: not versioned (API rule 5).
  */
@@ -34,6 +37,7 @@ final class NotifyKitRouteLoader extends Loader
         private readonly bool $adminUi = false,
         private readonly string $adminPrefix = '/admin/notifications',
         ?string $env = null,
+        private readonly string $preferencesPath = '/account/notifications',
     ) {
         parent::__construct($env);
     }
@@ -43,8 +47,13 @@ final class NotifyKitRouteLoader extends Loader
      */
     public function load(mixed $resource, ?string $type = null): RouteCollection
     {
-        $routes = new RouteCollection();
-        foreach ([InboxController::class => $this->webUi ? $this->webPrefix : null, OperatorController::class => $this->adminUi ? $this->adminPrefix : null] as $controller => $prefix) {
+        $routes      = new RouteCollection();
+        $controllers = [
+            InboxController::class       => $this->webUi ? $this->webPrefix : null,
+            PreferencesController::class => $this->webUi ? $this->preferencesPath : null,
+            OperatorController::class    => $this->adminUi ? $this->adminPrefix : null,
+        ];
+        foreach ($controllers as $controller => $prefix) {
             if ($prefix === null) {
                 continue;
             }

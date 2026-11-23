@@ -12,8 +12,10 @@ use Doctrine\Persistence\ManagerRegistry;
 use LogicException;
 use Nowo\NotifyKitBundle\Domain\DedupeMarker;
 use Nowo\NotifyKitBundle\Domain\Notification;
+use Nowo\NotifyKitBundle\Domain\StoredPreference;
 use Nowo\NotifyKitBundle\Infrastructure\Doctrine\Entity\DedupeRecord;
 use Nowo\NotifyKitBundle\Infrastructure\Doctrine\Entity\NotificationRecord;
+use Nowo\NotifyKitBundle\Infrastructure\Doctrine\Entity\PreferenceRecord;
 use Nowo\NotifyKitBundle\Infrastructure\Doctrine\NotifyKitMetadataListener;
 use Nowo\NotifyKitBundle\Infrastructure\Schema\SchemaChecker;
 use Nowo\NotifyKitBundle\Tests\Integration\Kernel\Host;
@@ -47,6 +49,18 @@ final class SchemaTest extends KernelTestCase
             $this->describe($this->table(['doctrine' => ['mapping' => 'xml']], DedupeMarker::class)),
             $this->describe($this->table(['doctrine' => ['mapping' => 'attribute']], DedupeRecord::class)),
         );
+
+        $preference = $this->describe($this->table(['doctrine' => ['mapping' => 'xml']], StoredPreference::class));
+        self::assertSame($preference, $this->describe($this->table(['doctrine' => ['mapping' => 'attribute']], PreferenceRecord::class)));
+        self::assertSame([['recipient_type', 'recipient_id', 'context_key', 'category', 'channel'], true, false], $preference['indexes']['uniq_nowo_notify_preference_cell']);
+    }
+
+    public function testPreferenceCellColumnsAreBinaryOnMySql(): void
+    {
+        $table = $this->table([], StoredPreference::class);
+        foreach (['id', 'recipient_type', 'recipient_id', 'context_key', 'category', 'channel', 'scope'] as $column) {
+            self::assertSame($this->binaryCollation, $table->getColumn($column)->getPlatformOptions()['collation'] ?? null, $column);
+        }
     }
 
     public function testIdentifierColumnsAreBinaryOnMySqlAndExactElsewhere(): void
@@ -69,7 +83,7 @@ final class SchemaTest extends KernelTestCase
         $doctrine = $kernel->getContainer()->get('doctrine');
         self::assertInstanceOf(ManagerRegistry::class, $doctrine);
         $checker = new SchemaChecker($doctrine, 'default', 'nowo_');
-        self::assertSame(['nowo_notify_notification', 'nowo_notify_dedupe'], $checker->tables());
+        self::assertSame(['nowo_notify_notification', 'nowo_notify_dedupe', 'nowo_notify_preference'], $checker->tables());
 
         $this->expectException(LogicException::class);
         $this->expectExceptionMessage('the bundle mapping is not registered on the entity manager "default"');

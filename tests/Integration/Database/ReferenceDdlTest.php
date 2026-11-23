@@ -13,6 +13,7 @@ use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\Persistence\ManagerRegistry;
 use Nowo\NotifyKitBundle\Domain\DedupeMarker;
 use Nowo\NotifyKitBundle\Domain\Notification;
+use Nowo\NotifyKitBundle\Domain\StoredPreference;
 use Nowo\NotifyKitBundle\Tests\Integration\Kernel\Host;
 use Nowo\NotifyKitBundle\Tests\Integration\Kernel\KernelTestCase;
 
@@ -51,7 +52,7 @@ final class ReferenceDdlTest extends KernelTestCase
             $platform instanceof PostgreSQLPlatform    => 'postgresql',
             default                                    => 'sqlite',
         };
-        $ddl = implode(";\n", (new SchemaTool($em))->getCreateSchemaSql([$em->getClassMetadata(Notification::class), $em->getClassMetadata(DedupeMarker::class)])) . ';';
+        $ddl = implode(";\n", (new SchemaTool($em))->getCreateSchemaSql([$em->getClassMetadata(Notification::class), $em->getClassMetadata(DedupeMarker::class), $em->getClassMetadata(StoredPreference::class)])) . ';';
         if (getenv('NOWO_PRINT_DDL') === '1') {
             fwrite(STDERR, "\n<!-- ddl:" . $name . " -->\n```sql\n" . $ddl . "\n```\n");
         }
@@ -63,7 +64,7 @@ final class ReferenceDdlTest extends KernelTestCase
 
             return;
         }
-        preg_match_all('/\b((?:idx_)?nowo_notify_[a-z_]+)\b/', $match[1], $names);
+        preg_match_all('/\b((?:idx_|uniq_)?nowo_notify_[a-z_]+)\b/', $match[1], $names);
         foreach ($names[1] as $object) {
             self::assertStringContainsString($object, $ddl);
         }

@@ -18,4 +18,7 @@ final class NotifyKitEvents
 
     /** {@see NotificationSkippedEvent}. */
     public const SKIPPED = NotificationSkippedEvent::class;
+
+    /** {@see PreferencesChangedEvent} (S3). */
+    public const PREFERENCES_CHANGED = PreferencesChangedEvent::class;
 }

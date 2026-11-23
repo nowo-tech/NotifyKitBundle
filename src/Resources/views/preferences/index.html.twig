@@ -1,0 +1,36 @@
+{#
+  Preferences page (contract §8.3, REQ-UI-003): UiKit settings scaffold. Variables: page (Nowo\UiKitBundle\View\SettingsPage),
+  grid (Presentation\View\PreferenceGrid), form (the matrix form), notice (null, "saved" or "stale"), cells_url (JSON
+  autosave endpoint), csrf (token nowo_notify_kit_preferences for the X-CSRF-TOKEN header).
+
+  The account page holds the master switch, the category × channel matrix (a scope select per category) and the
+  contexts with their switches and a link to each context's overrides; a context page holds that context's matrix and
+  the header actions *Reset to account settings* / *Back*. Without JavaScript the form saves with its submit button;
+  the script (js/nowo-notify-kit-preferences.js) saves each change at once and opens a context's overrides in a dialog
+  it loads on demand.
+
+  Override: a template that extends '@!NowoNotifyKitBundle/preferences/index.html.twig' (blocks below), or
+  web_ui.templates.preferences; the grid itself is '@NowoNotifyKitBundle/preferences/_matrix.html.twig' (embeddable).
+  Restyle through nowo_ui_kit.theme (slots).
+#}
+{% extends '@NowoUiKitBundle/page/settings.html.twig' %}
+
+{% block nowo_ui_styles %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('css/nowo-notify-kit.css', 'nowo_notify_kit') }}">
+{% endblock %}
+
+{% block nowo_ui_content %}
+    {% block nowo_notify_kit_preferences_notice %}
+        {% include '@NowoNotifyKitBundle/preferences/_notice.html.twig' with {notice: notice|default(null), bundle: page.bundle} only %}
+    {% endblock %}
+    {{ parent() }}
+    {% block nowo_notify_kit_preferences_assets %}
+        {%- set _nonce = app is defined and app and app.request ? app.request.attributes.get('csp_nonce') : null -%}
+        <script src="{{ asset('js/nowo-notify-kit-preferences.js', 'nowo_notify_kit') }}" defer{% if _nonce %} nonce="{{ _nonce }}"{% endif %}></script>
+    {% endblock %}
+{% endblock %}
+
+{% block nowo_ui_settings_section %}
+    {% include '@NowoNotifyKitBundle/preferences/_matrix.html.twig' with {grid: grid, form: section.form, cells_url: cells_url, csrf: csrf, bundle: page.bundle} only %}
+{% endblock %}

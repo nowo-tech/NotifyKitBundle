@@ -11,8 +11,10 @@ use Doctrine\ORM\Event\LoadClassMetadataEventArgs;
 use LogicException;
 use Nowo\NotifyKitBundle\Domain\DedupeMarker;
 use Nowo\NotifyKitBundle\Domain\Notification;
+use Nowo\NotifyKitBundle\Domain\StoredPreference;
 use Nowo\NotifyKitBundle\Infrastructure\Doctrine\Entity\DedupeRecord;
 use Nowo\NotifyKitBundle\Infrastructure\Doctrine\Entity\NotificationRecord;
+use Nowo\NotifyKitBundle\Infrastructure\Doctrine\Entity\PreferenceRecord;
 use Throwable;
 
 use function in_array;
@@ -37,16 +39,21 @@ final readonly class NotifyKitMetadataListener
     /** Unprefixed dedupe table. */
     public const DEDUPE_TABLE = 'notify_dedupe';
 
+    /** Unprefixed preference table (S3). */
+    public const PREFERENCE_TABLE = 'notify_preference';
+
     /** Mapped class => unprefixed table. */
     public const TABLES = [
         Notification::class       => self::NOTIFICATION_TABLE,
         NotificationRecord::class => self::NOTIFICATION_TABLE,
         DedupeMarker::class       => self::DEDUPE_TABLE,
         DedupeRecord::class       => self::DEDUPE_TABLE,
+        StoredPreference::class   => self::PREFERENCE_TABLE,
+        PreferenceRecord::class   => self::PREFERENCE_TABLE,
     ];
 
-    /** Identifier columns: keys, ids, references, the target and the dedupe hash. */
-    public const ID_COLUMNS = ['id', 'recipient_type', 'recipient_id', 'type', 'category', 'actor_type', 'actor_id', 'context_type', 'context_id', 'target', 'key_hash'];
+    /** Identifier columns: keys, ids, references, the target, the dedupe hash and the preference cell. */
+    public const ID_COLUMNS = ['id', 'recipient_type', 'recipient_id', 'type', 'category', 'actor_type', 'actor_id', 'context_type', 'context_id', 'target', 'key_hash', 'context_key', 'channel', 'scope'];
 
     /**
      * The binary NO PAD collation of the platform: MariaDB `utf8mb4_nopad_bin`, MySQL 8 `utf8mb4_0900_bin`, else the

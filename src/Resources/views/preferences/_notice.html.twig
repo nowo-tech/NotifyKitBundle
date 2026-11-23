@@ -1,0 +1,9 @@
+{#
+  Result of a no-JS save above the preferences form: notice "saved" (status) or "stale" (another tab or device changed a
+  setting first: the page shows the current settings, nothing was saved). Variables: notice, bundle.
+#}
+{%- if notice == 'saved' -%}
+    <p class="{{ nowo_ui_class('flash_success', bundle) }}" role="status" data-testid="notify-kit-preferences-saved">{{ 'notify.preferences.saved'|trans({}, 'NowoNotifyKitBundle') }}</p>
+{%- elseif notice == 'stale' -%}
+    <p class="{{ nowo_ui_class('flash_warning', bundle) }}" role="alert" data-testid="notify-kit-preferences-stale">{{ 'notify.preferences.stale'|trans({}, 'NowoNotifyKitBundle') }}</p>
+{%- endif -%}

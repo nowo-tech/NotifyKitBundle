@@ -11,6 +11,7 @@ use Nowo\NotifyKitBundle\Contract\TypeProviderInterface;
 use Nowo\NotifyKitBundle\Contract\TypeRegistryInterface;
 use Nowo\NotifyKitBundle\Contract\Urgency;
 
+use function array_keys;
 use function array_values;
 use function sprintf;
 use function uasort;
@@ -39,6 +40,9 @@ final readonly class TypeRegistry implements TypeRegistryInterface
     /** @var array<string, CategoryDefinition> */
     private array $categories;
 
+    /** @var list<string> */
+    private array $channels;
+
     /**
      * @param array<string, TypeDefinition> $types
      * @param array<string, CategoryDefinition> $categories
@@ -47,6 +51,13 @@ final readonly class TypeRegistry implements TypeRegistryInterface
     {
         $this->types      = $types;
         $this->categories = $categories;
+        $channels         = [TypeDefinition::IN_APP => true];
+        foreach ($types as $type) {
+            foreach ([...array_keys($type->defaultChannels), ...$type->lockedChannels] as $channel) {
+                $channels[$channel] = true;
+            }
+        }
+        $this->channels = array_keys($channels);
     }
 
     /**
@@ -150,6 +161,6 @@ final readonly class TypeRegistry implements TypeRegistryInterface
      */
     public function channels(): array
     {
-        return [TypeDefinition::IN_APP];
+        return $this->channels;
     }
 }

@@ -9,6 +9,8 @@ use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 
+use function array_is_list;
+use function is_array;
 use function is_string;
 use function preg_match;
 use function sprintf;
@@ -252,6 +254,15 @@ final class Configuration implements ConfigurationInterface
                                     ->scalarPrototype()->cannotBeEmpty()->end()
                                 ->end()
                                 ->append(ConfigNodes::service('access_checker', 'InboxAccessCheckerInterface service; null = the role checker'))
+                                ->variableNode('preferences_roles')
+                                    ->info('Roles that open the preferences page (S3); null = access_roles; [] = any logged-in user')
+                                    ->defaultNull()
+                                    ->validate()
+                                        ->ifTrue(static fn (mixed $value): bool => $value !== null && !self::isRoleList($value))
+                                        ->thenInvalid('Expected null or a list of role names, got %s.')
+                                    ->end()
+                                ->end()
+                                ->append(ConfigNodes::service('preferences_access_checker', 'PreferencesAccessCheckerInterface service; null = the role checker on preferences_roles'))
                             ->end()
                         ->end()
                     ->end()
@@ -328,6 +339,23 @@ final class Configuration implements ConfigurationInterface
             ->end();
 
         return $node;
+    }
+
+    /**
+     * Whether $value is a list of non-empty strings.
+     */
+    private static function isRoleList(mixed $value): bool
+    {
+        if (!is_array($value) || !array_is_list($value)) {
+            return false;
+        }
+        foreach ($value as $role) {
+            if (!is_string($role) || $role === '') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
