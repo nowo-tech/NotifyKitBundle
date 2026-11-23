@@ -85,7 +85,7 @@
         "symfony/css-selector": "^7.4 || ^8.0",
         "symfony/dom-crawler": "^7.4 || ^8.0",
         "symfony/filesystem": "^7.4 || ^8.0",
-        "symfony/mercure": "^0.6.5 || ^0.7 || ^0.8 || ^0.9 || ^0.10",
+        "symfony/mercure": "^0.10",
         "symfony/messenger": "^7.4 || ^8.0",
         "symfony/phpunit-bridge": "^7.4 || ^8.0",
         "symfony/security-bundle": "^7.4 || ^8.0",
@@ -97,6 +97,9 @@
         "nowo-tech/doctrine-deadlock-retry-bundle": "A retrying TransactionRunnerInterface adapter for the bundle's writes (doctrine.transaction_runner)",
         "symfony/mercure-bundle": "Real-time unread badge through a private Mercure update per recipient (realtime.mode: mercure / auto)",
         "symfony/security-bundle": "The inbox page, bell and operator page (web_ui / admin_ui) need a firewall and a logged-in user"
+    },
+    "conflict": {
+        "symfony/mercure": "<0.10"
     },
     "autoload": {
         "psr-4": {

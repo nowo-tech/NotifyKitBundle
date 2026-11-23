@@ -21,7 +21,9 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Extension\Extension;
+use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Mercure\Authorization;
 use Symfony\Component\Mercure\HubInterface;
 
 use function sys_get_temp_dir;
@@ -74,6 +76,18 @@ final class WebUiWiringTest extends TestCase
         self::assertTrue($container->getDefinition('nowo_notify_kit.operator_access_checker')->getArgument(2));
         self::assertSame('off', $container->getParameter(NowoNotifyKitExtension::REALTIME_MODE));
         self::assertFalse($container->hasDefinition(MercureRealtimePublisher::class));
+    }
+
+    public function testTheSubscriberCookieCanBeLeftToTheHost(): void
+    {
+        $container     = $this->realtime('mercure');
+        $authorization = $container->getDefinition(MercureSubscription::class)->getArgument(2);
+        self::assertInstanceOf(Reference::class, $authorization, 'the bell sets the cookie by default');
+        self::assertSame(Authorization::class, (string) $authorization);
+
+        $container = $this->container();
+        (new NowoNotifyKitExtension())->load([['enabled' => true, 'realtime' => ['mode' => 'mercure', 'subscriber_cookie' => false]]], $container);
+        self::assertNull($container->getDefinition(MercureSubscription::class)->getArgument(2), 'realtime.subscriber_cookie: false sets no cookie (audit ZAJ-1)');
     }
 
     public function testTheRealtimePassKeepsMercureOnlyWithAHub(): void

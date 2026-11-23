@@ -32,7 +32,9 @@ S2 (access + UI, **immediate REQ-SEC-004 audit before the tag**):
   override `%actor%` / `%target%`; the operator page shows counts only. Bell, menu, count and JSON answers are
   `no-store, private`.
 - **Realtime.** Private Mercure updates on `notify-kit/r/<hmac>` (HMAC-SHA256 with `kernel.secret`), payload
-  `{event, unread}` only; the subscriber cookie names the person's own topic only.
+  `{event, unread}` only; the subscriber cookie names the person's own topic only (one cookie per hub path: the bell's
+  and the host's replace each other across requests, `realtime.subscriber_cookie: false` leaves the JWT to the host).
+  The bell injects the menu only from a non-redirected `text/html` answer and keeps only its menu element.
 - Not yet: the `limits.ui_writes` rate limit (S4).
 
 ## Threat model

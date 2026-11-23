@@ -223,9 +223,11 @@ final readonly class Notifier implements NotifierInterface
                 $this->dispatcher->dispatch(new NotificationRecordedEvent($outcome->id, $allowed[$index], $request->type, $request->context, $outcome->coalesced));
             }
         }
+        $written = [];
         foreach ($outcomes ?? [] as $index => $outcome) {
-            $this->badge?->publish($allowed[$index]);
+            $written[] = $allowed[$index];
         }
+        $this->badge?->publishAll($written);
     }
 
     private function now(): DateTimeImmutable

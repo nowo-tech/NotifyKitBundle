@@ -30,7 +30,7 @@ final class ConfigurationTest extends TestCase
         ], $config['channels']);
         self::assertSame(['in_app' => 'sync', 'channels' => 'async', 'transport_hint' => null], $config['delivery']);
         self::assertSame(['repeat_window_seconds' => 600, 'menu_limit' => 15, 'page_size' => 25], $config['inbox']);
-        self::assertSame(['mode' => 'auto', 'poll_seconds' => 60, 'publisher' => null], $config['realtime']);
+        self::assertSame(['mode' => 'auto', 'poll_seconds' => 60, 'subscriber_cookie' => true, 'publisher' => null], $config['realtime']);
         self::assertSame(['scopes' => ['all', 'involved'], 'contexts' => ['provider' => null, 'label' => 'notify.context.project']], $config['preferences']);
         self::assertSame(['default_timezone' => 'UTC', 'allow_urgent_bypass' => true], $config['quiet_hours']);
         self::assertSame(['modes' => ['off', 'hourly', 'daily'], 'default_hour' => 8], $config['digest']);

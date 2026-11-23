@@ -14,6 +14,8 @@
 - [Inbox, bell and pages (S2)](#inbox-bell-and-pages-s2)
 - [Reading the inbox from code (S2)](#reading-the-inbox-from-code-s2)
 - [Realtime badge (S2)](#realtime-badge-s2)
+  - [The Mercure subscriber cookie](#the-mercure-subscriber-cookie)
+  - [What publishing costs](#what-publishing-costs)
 - [Retention and schema check](#retention-and-schema-check)
 - [Using it from a DDD / hexagonal application](#using-it-from-a-ddd--hexagonal-application)
 - [FrankenPHP worker mode](#frankenphp-worker-mode)
@@ -198,13 +200,44 @@ changed (`all: true` for *mark all*, `read: false` for *mark unread*).
 | `realtime.mode` | What happens |
 | --- | --- |
 | `auto` (default) | `mercure` when a Mercure hub service exists (MercureBundle), else `poll` |
-| `mercure` | After each commit, one **private** update per recipient on `notify-kit/r/<hmac>` (HMAC-SHA256 of the recipient key with `kernel.secret`), payload `{"event":"notify.updated","unread":n}` only. The bell sets the subscriber cookie for the person's own topic (MercureBundle `Authorization`; when the cookie cannot be set, e.g. a hub on another site or symfony/mercure 0.10's `__Secure-` cookie on plain HTTP, the bell falls back to polling); `RealtimeTopics::subscribeClaimFor()` gives you the claim for your own JWT. Without a hub the container refuses to build |
+| `mercure` | After each commit, one **private** update per recipient on `notify-kit/r/<hmac>` (HMAC-SHA256 of the recipient key with `kernel.secret`), payload `{"event":"notify.updated","unread":n}` only. The bell sets the subscriber cookie for the person's own topic (MercureBundle `Authorization`, see [the subscriber cookie](#the-mercure-subscriber-cookie)). The bell falls back to polling when the cookie cannot be set while the page renders (a hub on another site, or the `__Secure-` cookie of symfony/mercure 0.10 on plain HTTP), and in the browser when the stream fails: closed by the hub, or 3 errors in a row (an expired or replaced cookie, a hub answering 401). It then polls `…/count` once at once and every `realtime.poll_seconds` after. Without a hub the container refuses to build |
 | `poll` | The bell polls `…/count` every `realtime.poll_seconds` (≥ 10), paused while the tab is hidden |
 | `off` | No updates; the count refreshes on the next page |
 
 With `realtime.publisher` your own `RealtimePublisherInterface` service is called instead (Beacon keeps its topic,
 Q-B3); dispatch `nowo-notify-kit:updated` on `document` with `detail: {unread: n}` to update the bell. A failing
 publisher is logged and never fails the request.
+
+### The Mercure subscriber cookie
+
+A hub path has **one** subscriber cookie (`mercureAuthorization`). symfony/mercure 0.10 (required: the bundle conflicts
+with older versions) merges the grants of every `setCookie()` in the same request, so the bell and your own
+`mercure(…, {subscribe: …})` share one cookie on a page that renders both. **Across requests they replace each other**:
+a page with the bell overwrites a cookie you set on an earlier request (for example a token endpoint of a co-editing
+page), and your cookie overwrites the bell's. Whichever stream reconnects next loses its grant; the bell then polls (see
+above). Two ways to avoid it:
+
+- Grant the bell's topic yourself wherever you set the cookie: add `RealtimeTopics::subscribeClaimFor($recipient)` to
+  your subscribe list.
+- Or set `realtime.subscriber_cookie: false`: the bell sets no cookie and expects your JWT (cookie or
+  `Authorization` header) to hold `subscribeClaimFor()`.
+
+The bell's grant is always the person's own topic only.
+
+### What publishing costs
+
+Publishing is synchronous, after the commit: per written recipient one visibility check (one query plus one access
+checker call per permission), one unread count and one HTTP call to the hub. `notify()` for 1,000 recipients makes
+1,000 hub calls. The first failure (hub down, timeout) stops the badges for the rest of that call, so a dead hub costs
+one timeout per call, not one per recipient; those bells catch up on the next change or page load. To keep the hub off
+the request:
+
+- Give the HTTP client that publishes to your hub a short `timeout` / `max_duration`.
+- Or publish through Messenger: a `realtime.publisher` service that dispatches
+  `new Update($topics->topicFor($recipient), json_encode(['event' => 'notify.updated', 'unread' => $unread]), true)`
+  on the bus, with `Symfony\Component\Mercure\Update` routed to an async transport (symfony/mercure's `UpdateHandler`
+  sends it).
+- Or `realtime.mode: poll` / `off`.
 
 ## Retention and schema check
 

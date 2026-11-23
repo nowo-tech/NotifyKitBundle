@@ -308,7 +308,7 @@ final class NowoNotifyKitExtension extends Extension implements PrependExtension
      */
     private function registerReadSide(ContainerBuilder $container, array $config, Reference $store, Reference $logger): void
     {
-        /** @var array{mode: string, poll_seconds: int, publisher: string|null} $realtime */
+        /** @var array{mode: string, poll_seconds: int, subscriber_cookie: bool, publisher: string|null} $realtime */
         $realtime = $config['realtime'];
         /** @var array{directory: string|null} $recipient */
         $recipient = $config['recipient'];
@@ -331,7 +331,7 @@ final class NowoNotifyKitExtension extends Extension implements PrependExtension
             $container->setAlias(RealtimePublisherInterface::class, MercureRealtimePublisher::class)->setPublic(true);
             $container->register(MercureSubscription::class, MercureSubscription::class)->setArguments([
                 new Reference(HubInterface::class), new Reference('request_stack'),
-                new Reference(Authorization::class, ContainerInterface::NULL_ON_INVALID_REFERENCE), $logger,
+                $realtime['subscriber_cookie'] ? new Reference(Authorization::class, ContainerInterface::NULL_ON_INVALID_REFERENCE) : null, $logger,
             ]);
         }
         $container->setParameter(self::REALTIME_MODE, $mode === 'auto' ? 'poll' : $mode);

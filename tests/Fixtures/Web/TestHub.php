@@ -12,6 +12,7 @@ use Symfony\Component\Mercure\MockHub;
 use Symfony\Component\Mercure\ProtocolVersion;
 use Symfony\Component\Mercure\Update;
 
+use function array_walk_recursive;
 use function is_object;
 use function is_string;
 
@@ -80,9 +81,11 @@ final class TestHub implements HubInterface, TokenFactoryInterface
     {
         $topics = [];
         foreach ($subscribe ?? [] as $grant) {
-            foreach (is_object($grant) && property_exists($grant, 'topics') ? (array) $grant->topics : [$grant] as $topic) {
+            // 0.10 keeps merged grants keyed by matcher type (`['exact' => [...]]`).
+            $list = is_object($grant) && property_exists($grant, 'topics') ? (array) $grant->topics : [$grant];
+            array_walk_recursive($list, static function (mixed $topic) use (&$topics): void {
                 $topics[] = is_string($topic) ? $topic : '?';
-            }
+            });
         }
 
         return 'jwt-for-' . implode(',', $topics);

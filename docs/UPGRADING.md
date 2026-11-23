@@ -27,8 +27,16 @@ php bin/console assets:install
   only publishes when a Mercure hub service exists (otherwise it is `poll`, and nothing is published).
 - **Hosts that already run a Mercure hub**: with the default `realtime.mode: auto`, `notify()` and the row operations
   now publish a private update (the unread count only) on `notify-kit/r/<hmac>` after each commit, even while
-  `web_ui.enabled` is `false`. Set `realtime.mode: off` to keep the 0.2 behaviour. The topic is derived from
-  `kernel.secret`: rotating the secret changes every topic (open tabs pick up the new one on the next page load).
+  `web_ui.enabled` is `false`. **Cost**: synchronously, per written recipient, one visibility check, one count query
+  and one HTTP call to the hub (a `notify()` to 1,000 people makes 1,000 hub calls; the first failure stops the rest of
+  that call). Set `realtime.mode: off` to keep the 0.2 behaviour, or keep the hub off the request with a short hub
+  timeout or a Messenger publisher ([USAGE](USAGE.md#what-publishing-costs)). The topic is derived from `kernel.secret`:
+  rotating the secret changes every topic (open tabs pick up the new one on the next page load).
+- **symfony/mercure 0.10 or later** when it is installed (`conflict: <0.10`): older versions throw when the bell and
+  the host set the subscriber cookie in the same request. There is one subscriber cookie per hub path, so the bell's
+  cookie and a cookie you set on another request replace each other: add `RealtimeTopics::subscribeClaimFor()` to your
+  own grants, or set `realtime.subscriber_cookie: false` and issue the JWT yourself
+  ([USAGE](USAGE.md#the-mercure-subscriber-cookie)).
 - To use the pages: import `@NowoNotifyKitBundle/Resources/config/routes.php`, set `recipient.class` or
   `recipient.resolver` (the container refuses `web_ui` without one), keep SecurityBundle and add `access_control` for
   `web_ui.path_prefix` (`ROLE_USER`) and `admin_ui.path_prefix` (`ROLE_ADMIN`); render `{{ notify_kit_bell() }}` in

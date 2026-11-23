@@ -24,7 +24,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     `subscribeClaimFor()`), the Mercure publisher (private update `{"event":"notify.updated","unread":n}` after the
     commit, never a title, URL or param) and the subscriber cookie for the person's own topic. `realtime.mode: auto`
     uses Mercure when a hub service exists and polls otherwise; `mercure` without a hub refuses to build; a host
-    publisher (`realtime.publisher`) is used as is. `notify()` and the row operations publish after the commit.
+    publisher (`realtime.publisher`) is used as is. `notify()` and the row operations publish after the commit; the
+    first publish failure stops the badges for the rest of that call (audit ZAJ-3). `realtime.subscriber_cookie`
+    (default `true`; `false` leaves the subscriber JWT to the host, audit ZAJ-1). The bell falls back to polling when
+    the Mercure stream is closed or fails 3 times in a row (audit ZAJ-2), and loads the menu only from a
+    non-redirected HTML answer, keeping only its menu element (audit ZAJ-I6).
   - **Header bell**: Twig function `notify_kit_bell()` (`<details>` disclosure that works without JavaScript, badge
     capped at `99+`, polite live region), the bell script (TypeScript, IIFE `js/nowo-notify-kit-bell.js`, Vitest
     ≥ 90 %; optional Stimulus peer `nowo-notify-kit--bell`) and `css/nowo-notify-kit.css` on UiKit tokens, both in the
@@ -62,7 +66,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Requires `nowo-tech/transaction-doctrine` ^1.8.1 (fixes GHSA-9wh3-m3m5-jffx and GHSA-65w2-9r4h-848g).
 - Requires `nowo-tech/ui-kit-bundle` ^2.68, `nowo-tech/form-kit-bundle` ^2.24, `symfony/{asset,form,framework-bundle,
   http-foundation,routing,security-core,security-csrf,translation,twig-bundle}`, `twig/twig`, `twig/extra-bundle` and
-  `twig/string-extra` (the pages and the bell, contract §2). `symfony/security-bundle` and `symfony/mercure-bundle` are suggested.
+  `twig/string-extra` (the pages and the bell, contract §2). Conflicts with `symfony/mercure` < 0.10 (a second
+  subscriber cookie in the same request threw there, audit ZAJ-1). `symfony/security-bundle` and `symfony/mercure-bundle` are suggested.
 - `NotificationStoreInterface` (internal) gains the read side; `countUnread()` takes an optional visibility.
 - The route loader `nowo_notify_kit` is registered even while the bundle is disabled (it then adds no route), so the
   routes import never fails.

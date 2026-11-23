@@ -130,6 +130,7 @@ final class Configuration implements ConfigurationInterface
                     ->children()
                         ->enumNode('mode')->values(['auto', 'mercure', 'poll', 'off'])->defaultValue('auto')->info('auto = Mercure when installed, else poll')->end()
                         ->integerNode('poll_seconds')->defaultValue(60)->min(10)->max(3600)->end()
+                        ->booleanNode('subscriber_cookie')->defaultTrue()->info('false = the bell sets no Mercure subscriber cookie; your own JWT must hold RealtimeTopics::subscribeClaimFor()')->end()
                         ->append(ConfigNodes::service('publisher', 'RealtimePublisherInterface service; null = bundle publisher'))
                     ->end()
                 ->end()

@@ -530,6 +530,14 @@ abstract class CoreFunctionalTestCase extends KernelTestCase
         $this->publisher()->fail = true;
         self::assertTrue($this->inbox()->markUnread($b, $theirs), 'a failing publisher never fails the call');
         self::assertSame(1, $this->inbox()->unreadCount($b));
+
+        $this->publisher()->attempts = 0;
+        $ids                         = $this->notifier()->notify(new NotificationRequest('billing.ready', [$a, $b, $this->r('c')], null, null, 'export:9', '/billing'))->notificationIds;
+        self::assertCount(3, $ids, 'every row is written');
+        self::assertSame(1, $this->publisher()->attempts, 'the first hub failure stops the badges of the rest of the call (audit ZAJ-3)');
+        $this->publisher()->fail = false;
+        $this->notifier()->notify(new NotificationRequest('billing.ready', [$a, $b], null, null, 'export:10', '/billing'));
+        self::assertSame(3, $this->publisher()->attempts, 'the next call publishes again');
     }
 
     public function testRowOperationsInsideARolledBackHostTransactionAnnounceNothing(): void

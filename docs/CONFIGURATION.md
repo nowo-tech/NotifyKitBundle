@@ -31,7 +31,7 @@ nowo_notify_kit:
         slack:  { enabled: auto }
     delivery: { in_app: sync, channels: async, transport_hint: null }  # async falls back to sync without Messenger (Q-O3)
     inbox: { repeat_window_seconds: 600, menu_limit: 15, page_size: 25 }
-    realtime: { mode: auto, poll_seconds: 60, publisher: null }        # auto = mercure if installed, else poll; off
+    realtime: { mode: auto, poll_seconds: 60, subscriber_cookie: true, publisher: null }  # auto = mercure if installed, else poll; off
     preferences: { scopes: [all, involved], contexts: { provider: null, label: 'notify.context.project' } }
     quiet_hours: { default_timezone: UTC, allow_urgent_bypass: true }
     digest: { modes: [off, hourly, daily], default_hour: 8 }
@@ -96,6 +96,7 @@ nowo_notify_kit:
 | `inbox.menu_limit` / `page_size` | Rows in the bell menu / per inbox page |
 | `realtime.mode` | `auto` (Mercure when a hub service exists, else `poll`), `mercure` (refuses to build without a hub), `poll`, `off` |
 | `realtime.poll_seconds` | Poll interval of the bell (paused while the tab is hidden) |
+| `realtime.subscriber_cookie` | `true`: the bell sets the Mercure subscriber cookie for the person's own topic. `false`: no cookie; your JWT must hold `RealtimeTopics::subscribeClaimFor()` ([USAGE](USAGE.md#the-mercure-subscriber-cookie)) |
 | `realtime.publisher` | Your `RealtimePublisherInterface` service (used as is; effective mode `host`) |
 | `preferences.contexts.provider` | Your `ContextProviderInterface` service (context labels on the rows; the per-context matrix arrives in S3) |
 | `web_ui.enabled` / `path_prefix` / `layout_template` / `templates.{bell,menu,inbox}` | The inbox page, bell endpoints and templates; needs `recipient.class` or `recipient.resolver`, Twig, forms, CSRF and SecurityBundle |

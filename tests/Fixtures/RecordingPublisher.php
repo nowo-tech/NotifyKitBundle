@@ -10,7 +10,7 @@ use RuntimeException;
 
 /**
  * Host realtime publisher of the tests: records every announcement (`recipient key => unread`, in order); fails while
- * `$fail` is set.
+ * `$fail` is set; `$attempts` counts every call, failed or not.
  */
 final class RecordingPublisher implements RealtimePublisherInterface
 {
@@ -19,8 +19,11 @@ final class RecordingPublisher implements RealtimePublisherInterface
 
     public bool $fail = false;
 
+    public int $attempts = 0;
+
     public function publishUnread(RecipientRef $recipient, int $unread): void
     {
+        ++$this->attempts;
         if ($this->fail) {
             throw new RuntimeException('hub down');
         }

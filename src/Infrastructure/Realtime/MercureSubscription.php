@@ -15,8 +15,12 @@ use Throwable;
 /**
  * The browser side of `realtime.mode: mercure`: the hub's public URL for the bell, and the subscriber cookie that
  * lets the current person (and only them) receive their own private topic (MercureBundle's `Authorization`, the same
- * cookie its `mercure()` Twig function sets). Without an `Authorization` service the host gives the JWT itself
+ * cookie its `mercure()` Twig function sets). Without an `Authorization` service, or with
+ * `realtime.subscriber_cookie: false` (no `Authorization` is injected then), the host gives the JWT itself
  * (`RealtimeTopics::subscribeClaimFor()`).
+ *
+ * There is one subscriber cookie per hub path: the bell's cookie and a cookie the host sets on another request replace
+ * each other (symfony/mercure >= 0.10, required through `conflict`, merges the grants set in the same request).
  *
  * Stateless (worker mode): the request comes from the stack per call.
  */

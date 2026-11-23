@@ -7,6 +7,7 @@ namespace Nowo\NotifyKitBundle\Tests\Integration\Web;
 use LogicException;
 use Nowo\NotifyKitBundle\Application\Realtime\RealtimeTopics;
 use Nowo\NotifyKitBundle\Contract\RecipientRef;
+use Nowo\NotifyKitBundle\Tests\Fixtures\Web\HostMercureCookie;
 use Nowo\NotifyKitBundle\Tests\Fixtures\Web\TestHub;
 use Nowo\NotifyKitBundle\Tests\Integration\Kernel\Host;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -61,6 +62,33 @@ final class RealtimeWebTest extends WebTestCase
         self::assertSame('jwt-for-' . $alice, $cookie->getValue(), 'only the person\'s own topic');
     }
 
+    public function testTheBellsGrantJoinsTheHostsGrantOfTheSameRequest(): void
+    {
+        $this->bootWeb(['realtime' => ['mode' => 'mercure']], static function (ContainerConfigurator $container): void {
+            self::mercure($container);
+            $container->services()->set(HostMercureCookie::class)->args([service(Authorization::class)])->tag('kernel.event_listener', ['event' => 'kernel.request']);
+        });
+        $topics = $this->kernel->getContainer()->get(RealtimeTopics::class);
+        self::assertInstanceOf(RealtimeTopics::class, $topics);
+        $alice = $topics->topicFor(new RecipientRef('user', 'alice'));
+
+        $bell = $this->as('alice', 'GET', '/bell')->filter('[data-nowo-notify-kit-bell]');
+        self::assertSame(200, $this->browser->getResponse()->getStatusCode(), 'the host page never fails (audit ZAJ-1)');
+        self::assertSame('mercure', $bell->attr('data-realtime'));
+        $cookie = $this->browser->getCookieJar()->get('mercureAuthorization', '/.well-known/mercure', 'localhost');
+        self::assertNotNull($cookie);
+        self::assertSame('jwt-for-host/wiki,' . $alice, $cookie->getValue(), 'one cookie with both grants');
+    }
+
+    public function testWithoutTheSubscriberCookieTheHostGivesTheJwt(): void
+    {
+        $this->bootWeb(['realtime' => ['mode' => 'mercure', 'subscriber_cookie' => false]], self::mercure(...));
+        $bell = $this->as('alice', 'GET', '/bell')->filter('[data-nowo-notify-kit-bell]');
+        self::assertSame('mercure', $bell->attr('data-realtime'));
+        self::assertSame('http://localhost/.well-known/mercure', $bell->attr('data-hub-url'));
+        self::assertNull($this->browser->getCookieJar()->get('mercureAuthorization', '/.well-known/mercure', 'localhost'), 'no cookie from the bell');
+    }
+
     public function testAHubTheBrowserCannotGetACookieForFallsBackToPolling(): void
     {
         $this->bootWeb(['realtime' => ['mode' => 'auto']], static function (ContainerConfigurator $container): void {
@@ -79,6 +107,15 @@ final class RealtimeWebTest extends WebTestCase
         $this->notify('billing.ready', ['alice']);
         self::assertSame('off', $this->as('alice', 'GET', '/bell')->filter('[data-nowo-notify-kit-bell]')->attr('data-realtime'));
         self::assertSame('off', $this->kernel->getContainer()->getParameter('nowo_notify_kit.realtime_mode'));
+    }
+
+    private static function mercure(ContainerConfigurator $container): void
+    {
+        $container->services()->set(TestHub::class)->public();
+        $container->services()->alias(HubInterface::class, TestHub::class);
+        $container->services()->set(HubRegistry::class)->args([service(TestHub::class)]);
+        $container->services()->set(Authorization::class)->args([service(HubRegistry::class)]);
+        $container->services()->set(SetCookieSubscriber::class)->tag('kernel.event_subscriber');
     }
 
     public function testMercureWithoutAHubRefusesToBuild(): void
