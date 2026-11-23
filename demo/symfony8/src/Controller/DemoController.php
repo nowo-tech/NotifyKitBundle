@@ -77,10 +77,12 @@ final class DemoController extends AbstractController
         $other = new RecipientRef('user', $me->id === 'alice' ? 'bob' : 'alice');
         /** @var array{kind: string} $data */
         $data   = $form->getData();
-        $result = $data['kind'] === 'project'
-            ? $this->notifier->notify(new NotificationRequest('demo.project_update', [new RecipientRef('user', 'alice'), new RecipientRef('user', 'bob')], new RecipientRef('user', 'carol'), new ContextRef('project', 'demo'), 'project:demo', '/notifications', ['project' => 'demo']))
-            : $this->notifier->notify(new NotificationRequest('demo.welcome', [$me], $other, null, 'welcome:' . $me->id, '/notifications'));
-        $this->addFlash('success', \sprintf('notify(): %d written, %d coalesced, %d skipped (access), %d skipped (actor).', $result->written, $result->coalesced, $result->skippedAccess, $result->skippedActor));
+        $result = match ($data['kind']) {
+            'project' => $this->notifier->notify(new NotificationRequest('demo.project_update', [new RecipientRef('user', 'alice'), new RecipientRef('user', 'bob')], new RecipientRef('user', 'carol'), new ContextRef('project', 'demo'), 'project:demo', '/notifications', ['project' => 'demo'])),
+            'mention' => $this->notifier->notify(new NotificationRequest('demo.mention', [$me], $other, null, 'mention:' . $me->id, '/notifications')),
+            default   => $this->notifier->notify(new NotificationRequest('demo.welcome', [$me], $other, null, 'welcome:' . $me->id, '/notifications')),
+        };
+        $this->addFlash('success', \sprintf('notify(): %d written, %d coalesced, %d skipped (access), %d skipped (actor), %d skipped (preferences).', $result->written, $result->coalesced, $result->skippedAccess, $result->skippedActor, $result->skippedPreference));
 
         return $this->redirectToRoute('demo_home');
     }

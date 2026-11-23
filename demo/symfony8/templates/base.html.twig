@@ -3,7 +3,7 @@
 {% extends '@NowoUiKit/demo_platform/layout.html.twig' %}
 {% set nowo_ui_demo_platform = {
     bundle: 'Notify Kit',
-    version: 'S2 access + UI',
+    version: 'S3 preferences',
     home_route: 'demo_home',
     repository: 'https://github.com/nowo-tech/NotifyKitBundle',
     translation_domain: false,
@@ -11,6 +11,7 @@
     nav: [
         {label: 'Home', route: 'demo_home', section: 'Demo'},
         {label: 'Inbox', route: 'nowo_notify_kit_inbox', active: ['nowo_notify_kit_inbox'], section: 'Notifications', testid: 'demo-nav-inbox'},
+        {label: 'Preferences', route: 'nowo_notify_kit_preferences', active: ['nowo_notify_kit_preferences', 'nowo_notify_kit_preferences_context'], section: 'Notifications', testid: 'demo-nav-preferences'},
         {label: 'Operator page', route: 'nowo_notify_kit_operator', section: 'Notifications', testid: 'demo-nav-operator'},
     ],
 } %}

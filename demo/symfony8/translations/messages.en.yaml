@@ -5,3 +5,5 @@ notify:
                 title: "%actor% says welcome to the demo"
             project_update:
                 title: "%actor% updated project %project%"
+            mention:
+                title: "%actor% mentioned you"
