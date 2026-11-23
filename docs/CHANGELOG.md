@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Table of contents
+
+- [[Unreleased]](#unreleased)
+- [[0.3.0] - 2026-11-23](#030---2026-11-23)
+- [[0.2.0] - 2026-11-18](#020---2026-11-18)
+- [[0.1.1] - 2026-11-17](#011---2026-11-17)
+- [[0.1.0] - 2026-11-15](#010---2026-11-15)
+
 ## [Unreleased]
 
 ### Added
@@ -35,6 +43,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     action log (ids, cell keys and counts only).
   - Translations of the page in 7 locales; `docs/USAGE.md` (preferences, audit trail, browser console),
     `docs/CONFIGURATION.md`, `docs/CONCURRENCY.md`, `docs/TEMPLATES.md`, `docs/UPGRADING.md`.
+
+### Changed
+
+- Application services depend on the new `Application\UnitOfWorkInterface` port instead of the infrastructure
+  transaction class (audit QL-I6).
+- The after-commit DBAL middleware wraps only the bundle connection (the connection of `doctrine.entity_manager`; audit
+  QL-I7).
+- `NotificationRequest::$involved` larger than `fan_out.max_recipients` is refused (audit QL-I3).
+
+## [0.3.0] - 2026-11-23
+
+### Added
 
 - **S2 access + UI** (contract 221-B §4.2, §6, §7.1, §8.1, §8.2, §8.4):
   - **Read-time visibility** (`Application\Visibility\VisibilityResolver`): personal rows always; a row with a
@@ -98,11 +118,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `NotificationStoreInterface` (internal) gains the read side; `countUnread()` takes an optional visibility.
 - The route loader `nowo_notify_kit` is registered even while the bundle is disabled (it then adds no route), so the
   routes import never fails.
-- Application services depend on the new `Application\UnitOfWorkInterface` port instead of the infrastructure
-  transaction class (audit QL-I6).
-- The after-commit DBAL middleware wraps only the bundle connection (the connection of `doctrine.entity_manager`; audit
-  QL-I7).
-- `NotificationRequest::$involved` larger than `fan_out.max_recipients` is refused (audit QL-I3).
+
+[0.3.0]: https://github.com/nowo-tech/NotifyKitBundle/releases/tag/v0.3.0
 
 ## [0.2.0] - 2026-11-18
 
@@ -199,5 +216,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   every MySQL dedupe claim look successful, so a duplicate notice can get through (fails open: no leak). Leave it off on
   that connection.
 
-[Unreleased]: https://github.com/nowo-tech/NotifyKitBundle/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/nowo-tech/NotifyKitBundle/compare/v0.3.0...HEAD
 [0.1.0]: https://github.com/nowo-tech/NotifyKitBundle/releases/tag/v0.1.0

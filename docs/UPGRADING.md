@@ -4,6 +4,7 @@
 
 - [Unreleased](#unreleased)
   - [S3: preferences](#s3-preferences)
+- [To 0.3.0](#to-030)
   - [S2: inbox, bell and pages](#s2-inbox-bell-and-pages)
 - [To 0.2.0](#to-020)
   - [Lock conflicts answer 409 + CONFLICT codes](#lock-conflicts-answer-409--conflict-codes)
@@ -39,6 +40,14 @@ php bin/console assets:install                  # js/nowo-notify-kit-preferences
 - **Internal**: the application services take `Application\UnitOfWorkInterface` (audit QL-I6); the after-commit DBAL
   middleware now wraps only the bundle connection (audit QL-I7). A host that constructed `Notifier`, `Inbox` or
   `Retention` by hand keeps working (`NotifyKitTransactions` implements the port).
+
+## To 0.3.0
+
+From **0.2.0**:
+
+```bash
+composer update nowo-tech/notify-kit-bundle
+```
 
 ### S2: inbox, bell and pages
 
