@@ -321,3 +321,8 @@
     outline: 2px solid var(--nowo-ui-focus-ring-color, currentColor);
     outline-offset: 1px;
 }
+
+/* The script saves every change at once and hides the save button: [hidden] must win over the theme's display. */
+.nowo-notify-kit-prefs [data-nowo-notify-kit-submit][hidden] {
+    display: none;
+}
