@@ -12,6 +12,7 @@ use Nowo\NotifyKitBundle\DependencyInjection\Compiler\RequireDoctrinePass;
 use Nowo\NotifyKitBundle\DependencyInjection\NowoNotifyKitExtension;
 use Nowo\NotifyKitBundle\Infrastructure\Messenger\PruneNotificationsHandler;
 use Nowo\NotifyKitBundle\Infrastructure\Recipient\DoctrineRecipientResolver;
+use Nowo\NotifyKitBundle\Presentation\Routing\NotifyKitRouteLoader;
 use Nowo\NotifyKitBundle\Tests\Fixtures\Standard\User;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -25,7 +26,7 @@ use function str_starts_with;
 
 final class ExtensionTest extends TestCase
 {
-    public function testDefaultsPublishTheParametersAndRegisterNoService(): void
+    public function testDefaultsPublishTheParametersAndRegisterOnlyTheEmptyRouteLoader(): void
     {
         $container = new ContainerBuilder();
         (new NowoNotifyKitExtension())->load([], $container);
@@ -34,10 +35,11 @@ final class ExtensionTest extends TestCase
         self::assertSame('/api', $container->getParameter('nowo_notify_kit.api_prefix'));
         self::assertSame('nowo_', $container->getParameter('nowo_notify_kit.table_prefix'));
         self::assertIsArray($container->getParameter('nowo_notify_kit.config'));
-        self::assertSame([], array_values(array_filter(
+        self::assertSame([NotifyKitRouteLoader::class], array_values(array_filter(
             array_keys($container->getDefinitions()),
             static fn (string $id): bool => !str_starts_with($id, 'service_container'),
-        )));
+        )), 'only the route loader, which adds no route while disabled');
+        self::assertSame([false, '/notifications', false, '/admin/notifications', '%kernel.environment%'], $container->getDefinition(NotifyKitRouteLoader::class)->getArguments());
     }
 
     public function testEnabledRegistersTheCore(): void

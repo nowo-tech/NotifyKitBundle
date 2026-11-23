@@ -1,0 +1,53 @@
+{#
+  Header bell (contract §8.1): `notify_kit_bell()` renders it for the logged-in person into the host's header actions
+  slot. Variables: unread (int), options ({label}), urls (inbox, menu, count, read_all, read, unread: the read / unread
+  URLs hold id_placeholder), id_placeholder, csrf (token `nowo_notify_kit_inbox` for the X-CSRF-TOKEN header), realtime
+  ({mode: mercure|host|poll|off, topic, hub, poll_seconds}).
+
+  Without JavaScript the <details> disclosure opens a panel that links to the inbox page. The script
+  (js/nowo-notify-kit-bell.js, asset package nowo_notify_kit) loads the menu the first time it opens, marks rows read /
+  unread, follows the realtime badge and closes on Escape or an outside click. The count is announced by the polite live
+  region next to the disclosure.
+
+  Override: templates/bundles/NowoNotifyKitBundle/bell/_bell.html.twig, or web_ui.templates.bell; keep the data-*
+  attributes the script reads. Blocks: nowo_notify_kit_bell_assets, nowo_notify_kit_bell_icon.
+#}
+{%- set _d = 'NowoNotifyKitBundle' -%}
+{%- set _nonce = app is defined and app and app.request ? app.request.attributes.get('csp_nonce') : null -%}
+{%- set _label = options.label|default('notify.bell.label'|trans({}, _d)) -%}
+{%- set _count = unread > 99 ? '99+' : unread -%}
+{% block nowo_notify_kit_bell_assets %}
+<link rel="stylesheet" href="{{ asset('css/nowo-notify-kit.css', 'nowo_notify_kit') }}">
+<script src="{{ asset('js/nowo-notify-kit-bell.js', 'nowo_notify_kit') }}" defer{% if _nonce %} nonce="{{ _nonce }}"{% endif %}></script>
+{% endblock %}
+<div class="nowo-notify-kit-bell-wrap" data-testid="notify-kit-bell">
+    <details class="nowo-notify-kit-bell" data-nowo-notify-kit-bell
+        data-menu-url="{{ urls.menu }}"
+        data-count-url="{{ urls.count }}"
+        data-read-url="{{ urls.read }}"
+        data-unread-url="{{ urls.unread }}"
+        data-read-all-url="{{ urls.read_all }}"
+        data-id-placeholder="{{ id_placeholder }}"
+        data-csrf-token="{{ csrf }}"
+        data-realtime="{{ realtime.mode }}"
+        data-poll-seconds="{{ realtime.poll_seconds }}"
+        {%- if realtime.hub %} data-hub-url="{{ realtime.hub }}" data-topic="{{ realtime.topic }}"{% endif %}
+        data-label="{{ _label }}"
+        data-unread-label="{{ 'notify.bell.unread'|trans({'%count%': '__count__'}, _d) }}"
+        data-loading-label="{{ 'notify.bell.loading'|trans({}, _d) }}"
+        data-error-label="{{ 'notify.bell.error'|trans({}, _d) }}">
+        <summary class="nowo-notify-kit-bell__button" data-testid="notify-kit-bell-button">
+            <span class="nowo-notify-kit-visually-hidden" data-nowo-notify-kit-name>{{ _label }} ({{ 'notify.bell.unread'|trans({'%count%': unread}, _d) }})</span>
+            {% block nowo_notify_kit_bell_icon %}
+            <svg class="nowo-notify-kit-bell__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2-3v-3a7 7 0 0 1 4-6"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/></svg>
+            {% endblock %}
+            <span class="nowo-notify-kit-bell__badge" data-nowo-notify-kit-badge aria-hidden="true" data-testid="notify-kit-badge"{% if unread == 0 %} hidden{% endif %}>{{ _count }}</span>
+        </summary>
+        <div class="nowo-notify-kit-bell__panel" data-nowo-notify-kit-panel>
+            <div class="nowo-notify-kit-menu__foot">
+                <a href="{{ urls.inbox }}">{{ 'notify.bell.open_inbox'|trans({}, _d) }}</a>
+            </div>
+        </div>
+    </details>
+    <span class="nowo-notify-kit-visually-hidden" aria-live="polite" data-nowo-notify-kit-live>{{ 'notify.bell.unread'|trans({'%count%': unread}, _d) }}</span>
+</div>

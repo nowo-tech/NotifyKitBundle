@@ -1,0 +1,46 @@
+{#
+  Bell panel fragment (GET web_ui.path_prefix/menu, contract §7.1): the latest inbox.menu_limit visible rows of the
+  logged-in person. Variables: rows (list of Presentation\View\InboxRow: notification, title, context, when, icon,
+  readHref, unreadHref, isUnread), unread (int), inbox_href.
+
+  Titles and labels are plain text, printed escaped inside <bdi dir="auto"> (a name in another script cannot reorder
+  the line). The buttons work through the bell script (fetch + X-CSRF-TOKEN); there is no form here.
+
+  Override: templates/bundles/NowoNotifyKitBundle/bell/_menu.html.twig or web_ui.templates.menu; keep data-id,
+  data-unread, data-action.
+#}
+{%- set _d = 'NowoNotifyKitBundle' -%}
+<div class="nowo-notify-kit-menu" data-nowo-notify-kit-menu data-unread="{{ unread }}">
+    <div class="nowo-notify-kit-menu__head">
+        <h2 class="nowo-notify-kit-menu__title">{{ 'notify.bell.title'|trans({}, _d) }}</h2>
+        {% if unread > 0 %}
+            <button type="button" class="{{ nowo_ui_class('btn_link', 'NowoNotifyKitBundle') }}" data-action="read-all" data-testid="notify-kit-menu-read-all">{{ 'notify.action.read_all'|trans({}, _d) }}</button>
+        {% endif %}
+    </div>
+    {% if rows is empty %}
+        <p class="nowo-notify-kit-menu__empty">{{ 'notify.bell.empty'|trans({}, _d) }}</p>
+    {% else %}
+        <ul class="nowo-notify-kit-menu__list" role="list">
+            {% for row in rows %}
+                {%- set _n = row.notification -%}
+                <li class="nowo-notify-kit-item{{ row.isUnread ? ' is-unread' }}" data-id="{{ _n.id.value }}" data-unread="{{ row.isUnread ? '1' : '0' }}" data-icon="{{ row.icon }}" data-testid="notify-kit-item-{{ _n.id.value }}">
+                    <a class="nowo-notify-kit-item__link" href="{{ _n.url }}" data-action="open">
+                        <bdi class="nowo-notify-kit-item__title" dir="auto">{{ row.title }}</bdi>
+                        <span class="nowo-notify-kit-item__meta">
+                            {%- if row.context %}<bdi dir="auto">{{ row.context }}</bdi> · {% endif -%}
+                            <time datetime="{{ _n.createdAt|date('c', 'UTC') }}" title="{{ _n.createdAt|date('Y-m-d H:i', 'UTC') }} UTC">{{ row.when }}</time>
+                            {%- if _n.repeats > 1 %} · {{ 'notify.item.repeats'|trans({'%count%': _n.repeats}, _d) }}{% endif -%}
+                        </span>
+                    </a>
+                    <button type="button" class="nowo-notify-kit-item__toggle" data-action="toggle"
+                        aria-label="{{ (row.isUnread ? 'notify.action.mark_read' : 'notify.action.mark_unread')|trans({}, _d) }}"
+                        data-label-read="{{ 'notify.action.mark_read'|trans({}, _d) }}"
+                        data-label-unread="{{ 'notify.action.mark_unread'|trans({}, _d) }}"></button>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+    <div class="nowo-notify-kit-menu__foot">
+        <a href="{{ inbox_href }}" data-testid="notify-kit-menu-inbox">{{ 'notify.bell.open_inbox'|trans({}, _d) }}</a>
+    </div>
+</div>

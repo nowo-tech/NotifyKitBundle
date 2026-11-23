@@ -7,11 +7,70 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **S2 access + UI** (contract 221-B §4.2, §6, §7.1, §8.1, §8.2, §8.4):
+  - **Read-time visibility** (`Application\Visibility\VisibilityResolver`): personal rows always; a row with a
+    context only while the access checker still grants the type's permission there (unknown types:
+    `access.default_permission`; a personal type in a context: never). The checker is asked **once per permission**
+    with every context of the person's rows; contexts it returns that were not candidates are ignored. Unrestricted
+    people see everything; a stored context the value objects refuse today stays hidden for everyone (fail closed).
+  - **`InboxInterface` read and row methods**: `unreadCount()`, `page()` (keyset, newest first, filters type /
+    category / status), `markRead()`, `markUnread()` (by id **and** recipient, visibility re-checked, `false` = 404),
+    `markAllRead()` (visible rows only, batches of `retention.batch_size`). New value objects `InboxFilter`,
+    `InboxStatus`, `InboxPage`, `NotificationView`; event `NotificationReadEvent` (ids only, after the commit, only when
+    something changed).
+  - **Realtime badge**: `RealtimePublisherInterface`, `Application\Realtime\RealtimeTopics` (`notify-kit/r/<hmac>`,
+    `subscribeClaimFor()`), the Mercure publisher (private update `{"event":"notify.updated","unread":n}` after the
+    commit, never a title, URL or param) and the subscriber cookie for the person's own topic. `realtime.mode: auto`
+    uses Mercure when a hub service exists and polls otherwise; `mercure` without a hub refuses to build; a host
+    publisher (`realtime.publisher`) is used as is. `notify()` and the row operations publish after the commit; the
+    first publish failure stops the badges for the rest of that call (audit ZAJ-3). `realtime.subscriber_cookie`
+    (default `true`; `false` leaves the subscriber JWT to the host, audit ZAJ-1). The bell falls back to polling when
+    the Mercure stream is closed or fails 3 times in a row (audit ZAJ-2), and loads the menu only from a
+    non-redirected HTML answer, keeping only its menu element (audit ZAJ-I6).
+  - **Header bell**: Twig function `notify_kit_bell()` (`<details>` disclosure that works without JavaScript, badge
+    capped at `99+`, polite live region), the bell script (TypeScript, IIFE `js/nowo-notify-kit-bell.js`, Vitest
+    ≥ 90 %; optional Stimulus peer `nowo-notify-kit--bell`) and `css/nowo-notify-kit.css` on UiKit tokens, both in the
+    new asset package `nowo_notify_kit`.
+  - **Pages and endpoints** (`@NowoNotifyKitBundle/Resources/config/routes.php`, loader type `nowo_notify_kit`):
+    inbox page (UiKit list scaffold, FormKit filter, keyset *Load more*, per-row read / unread, *Mark all as read*),
+    `GET …/menu`, `GET …/count` (`ETag`, `304`), `POST …/{id}/read`, `…/{id}/unread`, `…/read-all` (JSON for `fetch`
+    with `X-CSRF-TOKEN`, redirect to a local `_redirect` for FormKit forms), all `Cache-Control: no-store, private`;
+    operator page under `admin_ui.path_prefix` (counts only, *Run retention now*). Lock conflicts answer **409** +
+    `CONFLICT_001` + `Retry-After` (REQ-RUNTIME-003 rule 6).
+  - **Access to the pages (REQ-UI-002)**: `InboxAccessCheckerInterface` (`web_ui.security.access_roles` /
+    new `web_ui.security.access_checker`) and `OperatorAccessCheckerInterface` (`admin_ui.security.*`); the pages need
+    Twig, forms, CSRF and SecurityBundle (`Compiler\WebUiPass` names what is missing).
+  - Host SPIs `RecipientDirectoryInterface` (display names; default: the user object's `__toString()`, `getEmail()`,
+    `getLocale()` through the recipient resolver) and `ContextProviderInterface` (context labels; default: none);
+    `types.<key>.title_domain` (translation domain of a type title, default `messages`).
+  - Titles at display time (`Presentation\Title\NotificationTitles`, audit QL-I1): params as `%key%`, then the
+    built-ins `%actor%`, `%target%`, `%repeats%` (a param cannot spoof them), one line, printed escaped inside
+    `<bdi dir="auto">`; `_redirect` checked as a local path before and after URL-decoding.
+  - Translations ×7 for the bell, the pages and the operator page; `docs/TEMPLATES.md`.
+  - Demo: sign in as Alice or Bob, send notifications, the bell in the top bar, the inbox and operator pages, Playwright
+    e2e (bell, mark read, live badge by polling, deny by default, axe) and WebP screenshots.
+
+### Fixed
+
+- `DoctrineRecipientResolver::userOf()` no longer refreshes a user the host's entity manager already manages (it
+  overwrote pending changes of a managed, dirty user; audit QL-L4): the managed instance is returned untouched.
+- Standard hosts whose Doctrine configuration says `orm: ~` now get the bundle mapping too (the prepend looked for a
+  non-null `orm` key).
+
 ### Changed
 
 - Igor 0.11: the `ready` list of `AfterCommitQueue` is marked `#[WorkerSafe]` with the reason (a documented false positive: `reset()` runs and empties it through `drain()`). No behaviour change.
 - Demo: runs in UiKit's demo platform shell (`nowo-tech/ui-kit-bundle` ^2.60); the demo's own header is gone and the pages use the shell page headers and section cards. The demo lock is refreshed (transaction-doctrine 1.1.0 to 1.9.2) because it lagged behind the bundle's requirement. Demo only, no bundle change.
 - Requires `nowo-tech/transaction-doctrine` ^1.8.1 (fixes GHSA-9wh3-m3m5-jffx and GHSA-65w2-9r4h-848g).
+- Requires `nowo-tech/ui-kit-bundle` ^2.68, `nowo-tech/form-kit-bundle` ^2.24, `symfony/{asset,form,framework-bundle,
+  http-foundation,routing,security-core,security-csrf,translation,twig-bundle}`, `twig/twig`, `twig/extra-bundle` and
+  `twig/string-extra` (the pages and the bell, contract §2). Conflicts with `symfony/mercure` < 0.10 (a second
+  subscriber cookie in the same request threw there, audit ZAJ-1). `symfony/security-bundle` and `symfony/mercure-bundle` are suggested.
+- `NotificationStoreInterface` (internal) gains the read side; `countUnread()` takes an optional visibility.
+- The route loader `nowo_notify_kit` is registered even while the bundle is disabled (it then adds no route), so the
+  routes import never fails.
 
 ## [0.2.0] - 2026-11-18
 

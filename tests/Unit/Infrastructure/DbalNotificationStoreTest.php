@@ -12,15 +12,20 @@ use Doctrine\Persistence\ManagerRegistry;
 use Doctrine\Persistence\ObjectManager;
 use LogicException;
 use Nowo\NotifyKitBundle\Contract\ContextRef;
+use Nowo\NotifyKitBundle\Contract\InboxFilter;
 use Nowo\NotifyKitBundle\Contract\NotificationId;
 use Nowo\NotifyKitBundle\Contract\RecipientRef;
 use Nowo\NotifyKitBundle\Domain\Notification;
+use Nowo\NotifyKitBundle\Domain\Visibility;
+use Nowo\NotifyKitBundle\Domain\VisibleContext;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\AfterCommitQueue;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\DbalNotificationStore;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\NotifyKitTransactions;
 use Nowo\NotifyKitBundle\Tests\Fixtures\Sqlite;
 use PHPUnit\Framework\TestCase;
 use stdClass;
+
+use function count;
 
 /**
  * The store on a misconfigured, case-insensitive table (`COLLATE NOCASE`): the database matches `usera` for `UserA`,
@@ -106,6 +111,35 @@ final class DbalNotificationStoreTest extends TestCase
     private function draft(string $id, RecipientRef $recipient, ?ContextRef $context, DateTimeImmutable $at): Notification
     {
         return new Notification(new NotificationId($id), $recipient, 'issue.assigned', 'issues', null, $context, 'issue:1', '/i', [], 1, $at, $at);
+    }
+
+    public function testTheReadSideRefusesCaseInsensitiveMatchesAndDamagedContextsInPhp(): void
+    {
+        $now   = new DateTimeImmutable('2026-11-15 10:00:00', new DateTimeZone('UTC'));
+        $upper = new RecipientRef('user', 'UserA');
+        $lower = new RecipientRef('user', 'usera');
+        $this->store->record($this->draft('01933b1c-5d2e-7a3b-8c4d-000000000001', $upper, new ContextRef('project', 'P1'), $now), null);
+        $this->store->record($this->draft('01933b1c-5d2e-7a3b-8c4d-000000000002', $lower, new ContextRef('project', 'P1'), $now), null);
+        // A context id the value object refuses today (an older version stored it): hidden, never a candidate.
+        $this->connection->executeStatement("UPDATE nowo_notify_notification SET context_id = ' P1' WHERE id = '01933b1c-5d2e-7a3b-8c4d-000000000002'");
+        $this->store->record($this->draft('01933b1c-5d2e-7a3b-8c4d-000000000003', $lower, new ContextRef('project', 'p1'), $now), null);
+
+        // A NOCASE table may even group UserA's P1 with usera's p1: the PHP re-check fails closed (hidden, never leaked).
+        $pairs = $this->store->contextTypes($lower);
+        self::assertLessThanOrEqual(1, count($pairs), 'the damaged context is left out');
+        foreach ($pairs as [$context]) {
+            self::assertSame('p1', $context->id, 'never UserA\'s P1');
+        }
+        $granted = Visibility::of([new VisibleContext(new ContextRef('project', 'P1'), ['issue.assigned'])]);
+        self::assertSame([], $this->store->page($lower, $granted, InboxFilter::all(), null, 10), 'the database matched P1 for p1 and UserA for usera; PHP refused both');
+        self::assertSame(0, $this->store->countUnread($lower, $granted));
+        self::assertSame(1, $this->store->countUnread($lower, Visibility::unrestricted()), 'the damaged row is hidden even when unrestricted');
+        self::assertCount(1, $this->store->page($lower, Visibility::unrestricted(), new InboxFilter('issue.assigned', 'issues'), null, 10));
+        self::assertNull($this->store->find($lower, new NotificationId('01933b1c-5d2e-7a3b-8c4d-000000000001')));
+        [$ids, $next] = $this->store->unreadIds($lower, $granted, null, 2);
+        self::assertSame([], $ids);
+        self::assertSame('01933b1c-5d2e-7a3b-8c4d-000000000003', $next, 'the walk goes on past refused rows');
+        self::assertSame(0, $this->store->changeReadState($lower, [], $now));
     }
 
     private function transactions(Connection $connection): NotifyKitTransactions

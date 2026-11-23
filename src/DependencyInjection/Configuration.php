@@ -130,6 +130,7 @@ final class Configuration implements ConfigurationInterface
                     ->children()
                         ->enumNode('mode')->values(['auto', 'mercure', 'poll', 'off'])->defaultValue('auto')->info('auto = Mercure when installed, else poll')->end()
                         ->integerNode('poll_seconds')->defaultValue(60)->min(10)->max(3600)->end()
+                        ->booleanNode('subscriber_cookie')->defaultTrue()->info('false = the bell sets no Mercure subscriber cookie; your own JWT must hold RealtimeTopics::subscribeClaimFor()')->end()
                         ->append(ConfigNodes::service('publisher', 'RealtimePublisherInterface service; null = bundle publisher'))
                     ->end()
                 ->end()
@@ -246,10 +247,11 @@ final class Configuration implements ConfigurationInterface
                             ->addDefaultsIfNotSet()
                             ->children()
                                 ->arrayNode('access_roles')
-                                    ->requiresAtLeastOneElement()
+                                    ->info('The person needs one of these roles to open their inbox (REQ-UI-002); [] = any logged-in user')
                                     ->defaultValue(['ROLE_USER'])
                                     ->scalarPrototype()->cannotBeEmpty()->end()
                                 ->end()
+                                ->append(ConfigNodes::service('access_checker', 'InboxAccessCheckerInterface service; null = the role checker'))
                             ->end()
                         ->end()
                     ->end()
@@ -288,7 +290,7 @@ final class Configuration implements ConfigurationInterface
     }
 
     /**
-     * `types`: `{key: {category, icon, title_key, permission, channels, in_app_optional, locked_channels, urgency, coalesce, in_matrix}}`, merged with tagged providers.
+     * `types`: `{key: {category, icon, title_key, title_domain, permission, channels, in_app_optional, locked_channels, urgency, coalesce, in_matrix}}`, merged with tagged providers.
      */
     private function types(): ArrayNodeDefinition
     {
@@ -300,6 +302,7 @@ final class Configuration implements ConfigurationInterface
                     ->scalarNode('category')->isRequired()->cannotBeEmpty()->end()
                     ->scalarNode('icon')->defaultNull()->end()
                     ->scalarNode('title_key')->defaultNull()->info('null = notify.type.<key>.title')->end()
+                    ->scalarNode('title_domain')->defaultNull()->info('Translation domain of title_key; null = messages')->end()
                     ->scalarNode('permission')->defaultNull()->info('Permission needed to open the target; needs access.checker')->end()
                     ->arrayNode('channels')
                         ->info('Default channels, e.g. {in_app: true, mail: false}')

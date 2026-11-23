@@ -5,15 +5,25 @@ declare(strict_types=1);
 namespace Nowo\NotifyKitBundle\DependencyInjection;
 
 use LogicException;
+use Nowo\NotifyKitBundle\Application\Default\NoContextProvider;
 use Nowo\NotifyKitBundle\Application\Default\PersonalOnlyAccessChecker;
+use Nowo\NotifyKitBundle\Application\Default\ResolverRecipientDirectory;
 use Nowo\NotifyKitBundle\Application\Inbox;
 use Nowo\NotifyKitBundle\Application\Notifier;
+use Nowo\NotifyKitBundle\Application\Realtime\RealtimeTopics;
+use Nowo\NotifyKitBundle\Application\Realtime\UnreadBadge;
 use Nowo\NotifyKitBundle\Application\Retention\Retention;
 use Nowo\NotifyKitBundle\Application\TypeRegistry;
+use Nowo\NotifyKitBundle\Application\Visibility\VisibilityResolver;
+use Nowo\NotifyKitBundle\Contract\ContextProviderInterface;
 use Nowo\NotifyKitBundle\Contract\InboxInterface;
 use Nowo\NotifyKitBundle\Contract\NotifierInterface;
+use Nowo\NotifyKitBundle\Contract\RealtimePublisherInterface;
 use Nowo\NotifyKitBundle\Contract\RecipientAccessCheckerInterface;
+use Nowo\NotifyKitBundle\Contract\RecipientDirectoryInterface;
 use Nowo\NotifyKitBundle\Contract\RecipientResolverInterface;
+use Nowo\NotifyKitBundle\Contract\Security\InboxAccessCheckerInterface;
+use Nowo\NotifyKitBundle\Contract\Security\OperatorAccessCheckerInterface;
 use Nowo\NotifyKitBundle\Contract\TypeProviderInterface;
 use Nowo\NotifyKitBundle\Contract\TypeRegistryInterface;
 use Nowo\NotifyKitBundle\Domain\NotificationStoreInterface;
@@ -26,8 +36,22 @@ use Nowo\NotifyKitBundle\Infrastructure\Persistence\AfterCommitQueue;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\AfterCommitQueueResetListener;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\DbalNotificationStore;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\NotifyKitTransactions;
+use Nowo\NotifyKitBundle\Infrastructure\Realtime\MercureRealtimePublisher;
+use Nowo\NotifyKitBundle\Infrastructure\Realtime\MercureSubscription;
 use Nowo\NotifyKitBundle\Infrastructure\Recipient\DoctrineRecipientResolver;
 use Nowo\NotifyKitBundle\Infrastructure\Schema\SchemaChecker;
+use Nowo\NotifyKitBundle\NowoNotifyKitBundle;
+use Nowo\NotifyKitBundle\Presentation\Controller\InboxController;
+use Nowo\NotifyKitBundle\Presentation\Controller\OperatorController;
+use Nowo\NotifyKitBundle\Presentation\Form\ActionType;
+use Nowo\NotifyKitBundle\Presentation\Form\InboxFilterType;
+use Nowo\NotifyKitBundle\Presentation\Http\CurrentRecipient;
+use Nowo\NotifyKitBundle\Presentation\Routing\NotifyKitRouteLoader;
+use Nowo\NotifyKitBundle\Presentation\Security\RoleAccessChecker;
+use Nowo\NotifyKitBundle\Presentation\Title\NotificationTitles;
+use Nowo\NotifyKitBundle\Presentation\Twig\BellRenderer;
+use Nowo\NotifyKitBundle\Presentation\Twig\NotifyKitTwigExtension;
+use Nowo\NotifyKitBundle\Presentation\View\RelativeTime;
 use Symfony\Component\DependencyInjection\Argument\TaggedIteratorArgument;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -35,8 +59,11 @@ use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\Mercure\Authorization;
+use Symfony\Component\Mercure\HubInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 
+use function array_key_exists;
 use function class_exists;
 use function interface_exists;
 use function is_array;
@@ -65,6 +92,21 @@ final class NowoNotifyKitExtension extends Extension implements PrependExtension
     /** Service id of the bundle's transaction runner (`doctrine.transaction_runner`, or the default). */
     public const TRANSACTIONS = 'nowo_notify_kit.transactions';
 
+    /** Container parameter of the effective realtime mode (`mercure`, `host`, `poll`, `off`; set by the realtime pass). */
+    public const REALTIME_MODE = 'nowo_notify_kit.realtime_mode';
+
+    /** Container parameter of the configured `realtime.mode` (`auto`, `mercure`, `poll`, `off`). */
+    public const REALTIME_REQUESTED = 'nowo_notify_kit.realtime_requested';
+
+    /** Asset package of the bell script and stylesheet (REQ-ASSETS-004). */
+    public const ASSET_PACKAGE = 'nowo_notify_kit';
+
+    /** Public path of `assets:install` (`bundles/nowonotifykit`). */
+    public const ASSET_BASE_PATH = '/bundles/nowonotifykit';
+
+    /** FormKit profile of the bundle forms (`nowo_form_kit.profiles.notify_kit`). */
+    public const FORM_PROFILE = 'notify_kit';
+
     /**
      * The extension alias, `nowo_notify_kit`.
      */
@@ -75,10 +117,12 @@ final class NowoNotifyKitExtension extends Extension implements PrependExtension
 
     /**
      * Standard hosts (`doctrine.auto_mapping: true`, the default): registers the XML mapping (or the attribute twins)
-     * on `doctrine.entity_manager` when the host configures the ORM and the bundle is enabled.
+     * on `doctrine.entity_manager` when the host configures the ORM and the bundle is enabled. Always: the
+     * `nowo_notify_kit` asset package and the FormKit profile `notify_kit` (a host profile of that name wins).
      */
     public function prepend(ContainerBuilder $container): void
     {
+        $this->prependWebUi($container);
         if (!$container->hasExtension('doctrine')) {
             return;
         }
@@ -88,7 +132,7 @@ final class NowoNotifyKitExtension extends Extension implements PrependExtension
         }
         $hasOrm = false;
         foreach ($container->getExtensionConfig('doctrine') as $doctrine) {
-            $hasOrm = $hasOrm || (is_array($doctrine) && isset($doctrine['orm']));
+            $hasOrm = $hasOrm || (is_array($doctrine) && array_key_exists('orm', $doctrine));
         }
         if (!$hasOrm) {
             return;
@@ -113,11 +157,45 @@ final class NowoNotifyKitExtension extends Extension implements PrependExtension
         $container->setParameter(self::ALIAS . '.api_prefix', $config['api']['prefix']);
         $container->setParameter(self::ALIAS . '.table_prefix', $config['doctrine']['table_prefix']);
         $container->setParameter(self::ALIAS . '.config', $config);
+        $webUi   = $config['enabled'] && $config['web_ui']['enabled'];
+        $adminUi = $config['enabled'] && $config['admin_ui']['enabled'];
+        // The loader always exists (an import of the routes file never fails); it adds routes only for enabled UIs.
+        $container->register(NotifyKitRouteLoader::class, NotifyKitRouteLoader::class)
+            ->setArguments([$webUi, $config['web_ui']['path_prefix'], $adminUi, $config['admin_ui']['path_prefix'], '%kernel.environment%'])
+            ->addTag('routing.loader');
         if (!$config['enabled']) {
             return;
         }
 
         $this->registerCore($container, $config);
+        if ($webUi || $adminUi) {
+            $this->registerWebUi($container, $config, $webUi, $adminUi);
+        }
+    }
+
+    /**
+     * The `nowo_notify_kit` asset package and the FormKit profile `notify_kit` (bundle translation domain, UiKit input
+     * class); a host profile of that name wins.
+     */
+    private function prependWebUi(ContainerBuilder $container): void
+    {
+        if ($container->hasExtension('framework')) {
+            $container->prependExtensionConfig('framework', ['assets' => ['packages' => [self::ASSET_PACKAGE => ['base_path' => self::ASSET_BASE_PATH]]]]);
+        }
+        if (!$container->hasExtension('nowo_form_kit')) {
+            return;
+        }
+        foreach ($container->getExtensionConfig('nowo_form_kit') as $formKit) {
+            if (is_array($formKit) && is_array($formKit['profiles'] ?? null) && array_key_exists(self::FORM_PROFILE, $formKit['profiles'])) {
+                return;
+            }
+        }
+        $container->prependExtensionConfig('nowo_form_kit', ['profiles' => [self::FORM_PROFILE => [
+            'alias'                           => self::FORM_PROFILE,
+            'translation_domain'              => NowoNotifyKitBundle::TRANSLATION_DOMAIN,
+            'convention_requires_translation' => true,
+            'defaults'                        => ['attr' => ['class' => 'nowo-ui-input'], 'row_attr' => []],
+        ]]]);
     }
 
     /**
@@ -187,13 +265,19 @@ final class NowoNotifyKitExtension extends Extension implements PrependExtension
             $container->setAlias(RecipientResolverInterface::class, DoctrineRecipientResolver::class)->setPublic(true);
         }
 
+        $this->registerReadSide($container, $config, $store, $logger);
+
         $container->register(Notifier::class, Notifier::class)->setArguments([
             $store, $transactions, new Reference(TypeRegistryInterface::class), new Reference(RecipientAccessCheckerInterface::class),
             new Reference('event_dispatcher', ContainerInterface::IGNORE_ON_INVALID_REFERENCE),
             $config['inbox']['repeat_window_seconds'], $config['fan_out']['max_recipients'], $clock, $logger,
+            new Reference(UnreadBadge::class),
         ]);
         $container->setAlias(NotifierInterface::class, Notifier::class)->setPublic(true);
-        $container->register(Inbox::class, Inbox::class)->setArguments([$store, $transactions, $retention['batch_size']]);
+        $container->register(Inbox::class, Inbox::class)->setArguments([
+            $store, $transactions, new Reference(VisibilityResolver::class), new Reference(UnreadBadge::class),
+            new Reference('event_dispatcher', ContainerInterface::IGNORE_ON_INVALID_REFERENCE), $retention['batch_size'], $clock,
+        ]);
         $container->setAlias(InboxInterface::class, Inbox::class)->setPublic(true);
 
         $container->register(Retention::class, Retention::class)->setArguments([
@@ -213,6 +297,139 @@ final class NowoNotifyKitExtension extends Extension implements PrependExtension
         $container->register(SchemaCheckCommand::class, SchemaCheckCommand::class)
             ->setAutoconfigured(true)
             ->setArguments([new Reference(SchemaChecker::class)]);
+    }
+
+    /**
+     * The read side (S2): read-time visibility, realtime topics and publisher, the unread badge, the people directory
+     * and the context labels. The effective realtime mode is settled by {@see Compiler\RealtimePass} once the hub
+     * services are known.
+     *
+     * @param array<string, mixed> $config
+     */
+    private function registerReadSide(ContainerBuilder $container, array $config, Reference $store, Reference $logger): void
+    {
+        /** @var array{mode: string, poll_seconds: int, subscriber_cookie: bool, publisher: string|null} $realtime */
+        $realtime = $config['realtime'];
+        /** @var array{directory: string|null} $recipient */
+        $recipient = $config['recipient'];
+        /** @var array{contexts: array{provider: string|null}} $preferences */
+        $preferences = $config['preferences'];
+
+        $container->register(VisibilityResolver::class, VisibilityResolver::class)
+            ->setArguments([$store, new Reference(TypeRegistryInterface::class), new Reference(RecipientAccessCheckerInterface::class)]);
+        $container->register(RealtimeTopics::class, RealtimeTopics::class)->setArguments(['%kernel.secret%'])->setPublic(true);
+
+        $mode = $realtime['mode'];
+        if ($realtime['publisher'] !== null) {
+            $container->setAlias(RealtimePublisherInterface::class, $realtime['publisher'])->setPublic(true);
+            $mode = 'host';
+        } elseif (($mode === 'mercure' || $mode === 'auto') && interface_exists(HubInterface::class)) {
+            // Kept only when the host has a hub ({@see Compiler\RealtimePass}); `auto` falls back to polling.
+            $mode = 'mercure';
+            $container->register(MercureRealtimePublisher::class, MercureRealtimePublisher::class)
+                ->setArguments([new Reference(HubInterface::class), new Reference(RealtimeTopics::class)]);
+            $container->setAlias(RealtimePublisherInterface::class, MercureRealtimePublisher::class)->setPublic(true);
+            $container->register(MercureSubscription::class, MercureSubscription::class)->setArguments([
+                new Reference(HubInterface::class), new Reference('request_stack'),
+                $realtime['subscriber_cookie'] ? new Reference(Authorization::class, ContainerInterface::NULL_ON_INVALID_REFERENCE) : null, $logger,
+            ]);
+        }
+        $container->setParameter(self::REALTIME_MODE, $mode === 'auto' ? 'poll' : $mode);
+        $container->setParameter(self::REALTIME_REQUESTED, $realtime['mode']);
+
+        $container->register(UnreadBadge::class, UnreadBadge::class)->setArguments([
+            $store, new Reference(VisibilityResolver::class), new Reference(RealtimePublisherInterface::class, ContainerInterface::NULL_ON_INVALID_REFERENCE), $logger,
+        ]);
+        $this->service($container, RecipientDirectoryInterface::class, $recipient['directory'], new Definition(ResolverRecipientDirectory::class, [
+            new Reference(RecipientResolverInterface::class, ContainerInterface::NULL_ON_INVALID_REFERENCE),
+        ]));
+        $this->service($container, ContextProviderInterface::class, $preferences['contexts']['provider'], new Definition(NoContextProvider::class));
+    }
+
+    /**
+     * The inbox page, bell and JSON endpoints (`web_ui`) and the operator page (`admin_ui`), REQ-UI-001/002. Their
+     * host requirements (Twig, forms, CSRF, SecurityBundle) are checked by {@see Compiler\WebUiPass}.
+     *
+     * @param array<string, mixed> $config
+     */
+    private function registerWebUi(ContainerBuilder $container, array $config, bool $webUi, bool $adminUi): void
+    {
+        /** @var array{class: string|null, resolver: string|null} $recipient */
+        $recipient = $config['recipient'];
+        /** @var array{path_prefix: string, layout_template: string|null, templates: array{bell: string|null, menu: string|null, inbox: string|null}, security: array{access_roles: list<string>, access_checker: string|null}} $web */
+        $web = $config['web_ui'];
+        /** @var array{security: array{access_roles: list<string>, access_checker: string|null, allow_unauthenticated: bool}} $admin */
+        $admin = $config['admin_ui'];
+        if ($webUi && $recipient['class'] === null && $recipient['resolver'] === null) {
+            throw new LogicException('nowo_notify_kit.web_ui needs to know who the logged-in person is: set nowo_notify_kit.recipient.class (Doctrine user entity) or nowo_notify_kit.recipient.resolver.');
+        }
+        $logger        = new Reference('logger', ContainerInterface::IGNORE_ON_INVALID_REFERENCE);
+        $clock         = new Reference('clock', ContainerInterface::IGNORE_ON_INVALID_REFERENCE);
+        $authorization = new Reference('security.authorization_checker', ContainerInterface::NULL_ON_INVALID_REFERENCE);
+
+        // FormKit wires its options merger into tagged types (REQ-TWIG-005).
+        foreach ([InboxFilterType::class, ActionType::class] as $type) {
+            $container->register($type, $type)->addTag('form.type');
+        }
+        $container->register(CurrentRecipient::class, CurrentRecipient::class)->setArguments([
+            new Reference('security.token_storage', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+            new Reference(RecipientResolverInterface::class, ContainerInterface::NULL_ON_INVALID_REFERENCE),
+        ]);
+
+        if ($webUi) {
+            $this->checker($container, InboxAccessCheckerInterface::class, $web['security']['access_checker'], 'nowo_notify_kit.inbox_access_checker', [$authorization, $web['security']['access_roles'], false]);
+            $container->register(RelativeTime::class, RelativeTime::class)->setArguments([new Reference('translator')]);
+            $container->register(NotificationTitles::class, NotificationTitles::class)->setArguments([
+                new Reference('translator'), new Reference(TypeRegistryInterface::class), new Reference(RecipientDirectoryInterface::class), new Reference(ContextProviderInterface::class),
+            ]);
+            $container->register(InboxController::class, InboxController::class)
+                ->setPublic(true)
+                ->addTag('controller.service_arguments')
+                ->setArguments([
+                    new Reference(InboxInterface::class), new Reference(TypeRegistryInterface::class), new Reference(CurrentRecipient::class),
+                    new Reference(InboxAccessCheckerInterface::class), new Reference(NotificationTitles::class), new Reference(RelativeTime::class),
+                    new Reference('form.factory'), new Reference('twig'), new Reference('router'), new Reference('security.csrf.token_manager'), $clock,
+                    $config['inbox']['menu_limit'], $config['inbox']['page_size'], $web['layout_template'], $web['templates']['inbox'], $web['templates']['menu'],
+                ]);
+            $container->register(BellRenderer::class, BellRenderer::class)
+                ->addTag('twig.runtime')
+                ->setArguments([
+                    new Reference(CurrentRecipient::class), new Reference(InboxAccessCheckerInterface::class), new Reference(InboxInterface::class),
+                    new Reference('router'), new Reference('security.csrf.token_manager'),
+                    new Reference(RealtimePublisherInterface::class, ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                    new Reference(MercureSubscription::class, ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                    '%' . self::REALTIME_MODE . '%', $config['realtime']['poll_seconds'], $web['templates']['bell'],
+                ]);
+            $container->register(NotifyKitTwigExtension::class, NotifyKitTwigExtension::class)->addTag('twig.extension');
+        }
+
+        if ($adminUi) {
+            $this->checker($container, OperatorAccessCheckerInterface::class, $admin['security']['access_checker'], 'nowo_notify_kit.operator_access_checker', [
+                $authorization, $admin['security']['access_roles'], $admin['security']['allow_unauthenticated'],
+            ]);
+            $container->register(OperatorController::class, OperatorController::class)
+                ->setPublic(true)
+                ->addTag('controller.service_arguments')
+                ->setArguments([
+                    new Reference(NotificationStoreInterface::class), new Reference(Retention::class), new Reference(CurrentRecipient::class),
+                    new Reference(OperatorAccessCheckerInterface::class), new Reference('form.factory'), new Reference('twig'), new Reference('router'),
+                    new Reference('translator'), interface_exists(MessageBusInterface::class) ? new Reference('messenger.default_bus', ContainerInterface::NULL_ON_INVALID_REFERENCE) : null,
+                    $clock, $logger, '%' . self::REALTIME_MODE . '%', $web['layout_template'],
+                ]);
+        }
+    }
+
+    /**
+     * Aliases an access-checker port to the host's service, or to a {@see RoleAccessChecker} of its own ($id).
+     *
+     * @param list<mixed> $arguments
+     */
+    private function checker(ContainerBuilder $container, string $port, ?string $hostService, string $id, array $arguments): void
+    {
+        if ($hostService === null) {
+            $container->register($id, RoleAccessChecker::class)->setArguments($arguments);
+        }
+        $container->setAlias($port, $hostService ?? $id)->setPublic(true);
     }
 
     /**

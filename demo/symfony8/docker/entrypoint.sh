@@ -44,5 +44,8 @@ if [ ! -f /app/vendor/autoload_runtime.php ]; then
 fi
 
 php /app/bin/console doctrine:database:create --if-not-exists --no-interaction 2>/dev/null || true
+# Demo schema: the bundle tables from its XML mapping (a real host writes migrations from the reference DDL).
+php /app/bin/console doctrine:schema:update --force --complete --no-interaction 2>/dev/null || true
+php /app/bin/console assets:install public --no-interaction >/dev/null 2>&1 || true
 
 exec frankenphp run --config /etc/frankenphp/Caddyfile --adapter caddyfile

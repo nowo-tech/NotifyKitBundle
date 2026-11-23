@@ -6,6 +6,7 @@ namespace Nowo\NotifyKitBundle\Application;
 
 use DateTimeImmutable;
 use DateTimeZone;
+use Nowo\NotifyKitBundle\Application\Realtime\UnreadBadge;
 use Nowo\NotifyKitBundle\Contract\ContextRef;
 use Nowo\NotifyKitBundle\Contract\Event\NotificationRecordedEvent;
 use Nowo\NotifyKitBundle\Contract\Event\NotificationSkippedEvent;
@@ -45,7 +46,8 @@ use const SORT_STRING;
  *    permission is personal only).
  * 3. Writes in one transaction, recipients in key order (one lock order, no deadlock between two requests): takes the
  *    dedupe key, then coalesces or inserts each row.
- * 4. Dispatches the events after the commit (the outermost one when the call joined a host transaction).
+ * 4. Dispatches the events after the commit (the outermost one when the call joined a host transaction), then
+ *    publishes each written recipient's unread count when a realtime publisher is configured (S2).
  *
  * Stateless (worker mode): everything a call needs lives in the call.
  */
@@ -68,6 +70,7 @@ final readonly class Notifier implements NotifierInterface
         private int $maxRecipients = 1000,
         private ?ClockInterface $clock = null,
         private ?LoggerInterface $logger = null,
+        private ?UnreadBadge $badge = null,
     ) {
     }
 
@@ -209,22 +212,22 @@ final readonly class Notifier implements NotifierInterface
      */
     private function dispatch(NotificationRequest $request, array $skipped, array $allowed, ?array $outcomes): void
     {
-        if (!$this->dispatcher instanceof EventDispatcherInterface) {
-            return;
-        }
-        foreach ($skipped as [$recipient, $reason]) {
-            $this->dispatcher->dispatch(new NotificationSkippedEvent($request->type, $recipient, $reason));
-        }
-        if ($outcomes === null) {
-            foreach ($allowed as $recipient) {
+        if ($this->dispatcher instanceof EventDispatcherInterface) {
+            foreach ($skipped as [$recipient, $reason]) {
+                $this->dispatcher->dispatch(new NotificationSkippedEvent($request->type, $recipient, $reason));
+            }
+            foreach ($outcomes === null ? $allowed : [] as $recipient) {
                 $this->dispatcher->dispatch(new NotificationSkippedEvent($request->type, $recipient, SkipReason::Dedupe));
             }
-
-            return;
+            foreach ($outcomes ?? [] as $index => $outcome) {
+                $this->dispatcher->dispatch(new NotificationRecordedEvent($outcome->id, $allowed[$index], $request->type, $request->context, $outcome->coalesced));
+            }
         }
-        foreach ($outcomes as $index => $outcome) {
-            $this->dispatcher->dispatch(new NotificationRecordedEvent($outcome->id, $allowed[$index], $request->type, $request->context, $outcome->coalesced));
+        $written = [];
+        foreach ($outcomes ?? [] as $index => $outcome) {
+            $written[] = $allowed[$index];
         }
+        $this->badge?->publishAll($written);
     }
 
     private function now(): DateTimeImmutable

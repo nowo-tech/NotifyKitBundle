@@ -53,3 +53,34 @@ test('overview — bundle wiring on the UiKit shell', async ({ page }) => {
   await page.addStyleTag({ content: '.sf-toolbar,.sf-minitoolbar,[id^="sfwdt"]{display:none!important}' });
   await page.screenshot({ path: resolve(outDir, 'overview.png'), clip: await clipDemoFrame(page) });
 });
+
+async function signInAsAlice(page: Page): Promise<void> {
+  await page.goto('/');
+  await page.locator('[data-testid="demo-sign-in"] input[value="alice"]').check();
+  await page.locator('[data-testid="demo-sign-in"] [type="submit"]').first().click();
+  await expect(page.locator('[data-testid="notify-kit-bell"]')).toBeVisible();
+  for (const kind of ['welcome', 'project']) {
+    await page.locator('[data-testid="demo-notify"] select').selectOption(kind);
+    await page.locator('[data-testid="demo-notify"] [type="submit"]').first().click();
+  }
+}
+
+test('bell — the open header bell menu', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await signInAsAlice(page);
+  await page.addStyleTag({ content: '.sf-toolbar,.sf-minitoolbar,[id^="sfwdt"]{display:none!important}' });
+  await page.locator('[data-testid="notify-kit-bell-button"]').click();
+  await expect(page.locator('.nowo-notify-kit-item').first()).toBeVisible();
+  // Let the 120 ms opening animation finish.
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: resolve(outDir, 'bell.png'), clip: await clipDemoFrame(page) });
+});
+
+test('inbox — the inbox page', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await signInAsAlice(page);
+  await page.goto('/notifications');
+  await page.addStyleTag({ content: '.sf-toolbar,.sf-minitoolbar,[id^="sfwdt"]{display:none!important}' });
+  await expect(page.locator('[data-testid="notify-kit-inbox"]')).toBeVisible();
+  await page.screenshot({ path: resolve(outDir, 'inbox.png'), clip: await clipDemoFrame(page) });
+});

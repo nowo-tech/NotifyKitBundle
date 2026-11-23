@@ -6,22 +6,32 @@ namespace Nowo\NotifyKitBundle\Tests\Integration\Kernel;
 
 use Closure;
 use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
+use Nowo\FormKitBundle\NowoFormKitBundle;
 use Nowo\NotifyKitBundle\NowoNotifyKitBundle;
 use Nowo\NotifyKitBundle\Tests\Fixtures\NotifyController;
+use Nowo\NotifyKitBundle\Tests\Fixtures\Web\HeaderAuthenticator;
+use Nowo\NotifyKitBundle\Tests\Fixtures\Web\HostController;
+use Nowo\UiKitBundle\NowoUiKitBundle;
 use Psr\Log\NullLogger;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
+use Symfony\Bundle\SecurityBundle\SecurityBundle;
+use Symfony\Bundle\TwigBundle\TwigBundle;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
+use Twig\Extra\TwigExtraBundle\TwigExtraBundle;
 
 use function dirname;
+use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 use function sys_get_temp_dir;
 
 /**
  * Kernel of the integration tests: FrameworkBundle, the bundle and, on demand, DoctrineBundle (DBAL only, or what
- * `$configure` sets up: ORM, host fixtures). With `$notifyRoute`, `/notify` runs {@see NotifyController}.
+ * `$configure` sets up: ORM, host fixtures). With `$notifyRoute`, `/notify` runs {@see NotifyController}. With `$web`,
+ * a host with pages: SecurityBundle (a header authenticator: `X-Test-User`, `X-Test-Roles`), Twig, UiKit, FormKit,
+ * sessions, CSRF and forms, the bundle routes and `/bell` (a page that renders `notify_kit_bell()`).
  */
 final class TestKernel extends Kernel
 {
@@ -40,6 +50,7 @@ final class TestKernel extends Kernel
         private readonly ?Closure $configure = null,
         private readonly bool $notifyRoute = false,
         private readonly ?Closure $build = null,
+        private readonly bool $web = false,
     ) {
         parent::__construct('test', false);
     }
@@ -49,6 +60,13 @@ final class TestKernel extends Kernel
         yield new FrameworkBundle();
         if ($this->databaseUrl !== null) {
             yield new DoctrineBundle();
+        }
+        if ($this->web) {
+            yield new SecurityBundle();
+            yield new TwigBundle();
+            yield new TwigExtraBundle();
+            yield new NowoUiKitBundle();
+            yield new NowoFormKitBundle();
         }
         yield new NowoNotifyKitBundle();
     }
@@ -90,6 +108,9 @@ final class TestKernel extends Kernel
             'php_errors'            => ['log' => true],
             'router'                => ['utf8' => true],
         ]);
+        if ($this->web) {
+            $this->configureWeb($container);
+        }
         if ($this->databaseUrl !== null && !$this->configure instanceof Closure) {
             $container->extension('doctrine', ['dbal' => ['url' => $this->databaseUrl]]);
         }
@@ -112,5 +133,27 @@ final class TestKernel extends Kernel
         if ($this->notifyRoute) {
             $routes->add('notify', '/notify')->controller(NotifyController::class)->methods(['GET']);
         }
+        if ($this->web) {
+            $routes->import(dirname(__DIR__, 3) . '/src/Resources/config/routes.php');
+            $routes->add('host_bell', '/bell')->controller(HostController::class . '::bell')->methods(['GET']);
+        }
+    }
+
+    private function configureWeb(ContainerConfigurator $container): void
+    {
+        $container->extension('framework', [
+            'csrf_protection' => true,
+            'form'            => ['enabled' => true],
+            'session'         => ['storage_factory_id' => 'session.storage.factory.mock_file'],
+            'assets'          => ['enabled' => true],
+            'translator'      => ['default_path' => '%kernel.project_dir%/tests/Fixtures/translations', 'fallbacks' => ['en']],
+        ]);
+        $container->extension('twig', ['strict_variables' => true]);
+        $container->extension('security', [
+            'providers' => ['none' => ['memory' => ['users' => []]]],
+            'firewalls' => ['main' => ['stateless' => true, 'provider' => 'none', 'custom_authenticators' => [HeaderAuthenticator::class], 'entry_point' => HeaderAuthenticator::class]],
+        ]);
+        $container->services()->set(HeaderAuthenticator::class);
+        $container->services()->set(HostController::class)->args([service('twig')])->public()->tag('controller.service_arguments');
     }
 }

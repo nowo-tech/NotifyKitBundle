@@ -11,14 +11,21 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\ParameterType;
 use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
 use Nowo\NotifyKitBundle\Contract\ContextRef;
+use Nowo\NotifyKitBundle\Contract\Exception\InvalidNotificationArgumentException;
+use Nowo\NotifyKitBundle\Contract\InboxFilter;
+use Nowo\NotifyKitBundle\Contract\InboxStatus;
 use Nowo\NotifyKitBundle\Contract\NotificationId;
 use Nowo\NotifyKitBundle\Contract\RecipientRef;
 use Nowo\NotifyKitBundle\Domain\BatchResult;
+use Nowo\NotifyKitBundle\Domain\InboxCursor;
+use Nowo\NotifyKitBundle\Domain\InboxStatistics;
 use Nowo\NotifyKitBundle\Domain\Notification;
 use Nowo\NotifyKitBundle\Domain\NotificationStoreInterface;
 use Nowo\NotifyKitBundle\Domain\RecordOutcome;
+use Nowo\NotifyKitBundle\Domain\Visibility;
 use Nowo\NotifyKitBundle\Infrastructure\Doctrine\NotifyKitMetadataListener;
 
+use function array_fill;
 use function array_values;
 use function count;
 use function implode;
@@ -275,19 +282,230 @@ final readonly class DbalNotificationStore implements NotificationStoreInterface
     /**
      * {@inheritDoc}
      */
-    public function countUnread(RecipientRef $recipient): int
+    public function countUnread(RecipientRef $recipient, ?Visibility $visibility = null): int
     {
         $connection       = $this->transactions->connection();
         [$where, $values] = $this->exact($connection, ['recipient_type' => $recipient->type, 'recipient_id' => $recipient->id]);
-        $rows             = $connection->fetchAllAssociative(sprintf('SELECT recipient_type, recipient_id FROM %s WHERE %s AND read_at IS NULL', $this->table, $where), $values);
-        $count            = 0;
+        if ($visibility instanceof Visibility) {
+            [$filter, $more] = $this->visible($connection, $visibility);
+            $where .= ' AND ' . $filter;
+            $values = [...$values, ...$more];
+        }
+        $rows  = $connection->fetchAllAssociative(sprintf('SELECT recipient_type, recipient_id, context_type, context_id, type FROM %s WHERE %s AND read_at IS NULL', $this->table, $where), $values);
+        $count = 0;
         foreach ($rows as $row) {
-            if ($row['recipient_type'] === $recipient->type && $row['recipient_id'] === $recipient->id) {
+            if ($this->owns($row, $recipient) && (!$visibility instanceof Visibility || $this->allows($visibility, $row))) {
                 ++$count;
             }
         }
 
         return $count;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function contextTypes(RecipientRef $recipient): array
+    {
+        // Grouped by the exact bytes on MySQL (audit QL-M3): look-alike contexts never merge into one candidate.
+        $connection       = $this->transactions->connection();
+        [$where, $values] = $this->exact($connection, ['recipient_type' => $recipient->type, 'recipient_id' => $recipient->id]);
+        $mysql            = $connection->getDatabasePlatform() instanceof AbstractMySQLPlatform;
+        $columns          = [];
+        foreach (['recipient_type' => 'rt', 'recipient_id' => 'rid', 'context_type' => 'ct', 'context_id' => 'cid', 'type' => 'ty'] as $column => $alias) {
+            $columns[$alias] = $mysql ? 'CAST(' . $column . ' AS BINARY)' : $column;
+        }
+        $select = [];
+        foreach ($columns as $alias => $expression) {
+            $select[] = $expression . ' AS ' . $alias;
+        }
+        $rows = $connection->fetchAllAssociative(
+            sprintf('SELECT %s FROM %s WHERE %s AND context_type IS NOT NULL AND context_id IS NOT NULL GROUP BY %s', implode(', ', $select), $this->table, $where, implode(', ', $columns)),
+            $values,
+        );
+        $pairs = [];
+        foreach ($rows as $row) {
+            if ($row['rt'] !== $recipient->type || $row['rid'] !== $recipient->id) {
+                continue;
+            }
+            try {
+                $pairs[] = [new ContextRef((string) $row['ct'], (string) $row['cid']), (string) $row['ty']];
+            } catch (InvalidNotificationArgumentException) {
+                // A stored context the value object refuses today: its rows stay hidden.
+            }
+        }
+
+        return $pairs;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function page(RecipientRef $recipient, Visibility $visibility, InboxFilter $filter, ?InboxCursor $after, int $limit): array
+    {
+        $connection = $this->transactions->connection();
+        $exact      = ['recipient_type' => $recipient->type, 'recipient_id' => $recipient->id];
+        $exact += $filter->type !== null ? ['type' => $filter->type] : [];
+        $exact += $filter->category !== null ? ['category' => $filter->category] : [];
+        [$where, $values] = $this->exact($connection, $exact);
+        [$visible, $more] = $this->visible($connection, $visibility);
+        $where .= ' AND ' . $visible;
+        $values = [...$values, ...$more];
+        if ($filter->status === InboxStatus::Unread) {
+            $where .= ' AND read_at IS NULL';
+        } elseif ($filter->status === InboxStatus::Read) {
+            $where .= ' AND read_at IS NOT NULL';
+        }
+        if ($after instanceof InboxCursor) {
+            $where .= ' AND (created_at < ? OR (created_at = ? AND id < ?))';
+            $values = [...$values, $after->createdAt, $after->createdAt, $after->id];
+        }
+        $rows          = $connection->fetchAllAssociative(sprintf('SELECT %s FROM %s WHERE %s ORDER BY created_at DESC, id DESC LIMIT %d', self::COLUMNS, $this->table, $where, $limit), $values);
+        $notifications = [];
+        foreach ($rows as $row) {
+            if ($this->owns($row, $recipient) && $this->allows($visibility, $row)
+                && ($filter->type === null || $row['type'] === $filter->type)
+                && ($filter->category === null || $row['category'] === $filter->category)) {
+                $notifications[] = $this->hydrate($row);
+            }
+        }
+
+        return $notifications;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function find(RecipientRef $recipient, NotificationId $id): ?Notification
+    {
+        $connection       = $this->transactions->connection();
+        [$where, $values] = $this->exact($connection, ['id' => $id->value, 'recipient_type' => $recipient->type, 'recipient_id' => $recipient->id]);
+        $row              = $connection->fetchAssociative(sprintf('SELECT %s FROM %s WHERE %s', self::COLUMNS, $this->table, $where), $values);
+
+        return is_array($row) && $row['id'] === $id->value && $this->owns($row, $recipient) ? $this->hydrate($row) : null;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function changeReadState(RecipientRef $recipient, array $ids, ?DateTimeImmutable $readAt): int
+    {
+        if ($ids === []) {
+            return 0;
+        }
+        $connection       = $this->transactions->connection();
+        [$where, $values] = $this->exact($connection, ['recipient_type' => $recipient->type, 'recipient_id' => $recipient->id]);
+        $state            = $readAt instanceof DateTimeImmutable ? 'read_at IS NULL' : 'read_at IS NOT NULL';
+        $marks            = implode(', ', array_fill(0, count($ids), '?'));
+
+        return (int) $connection->executeStatement(
+            sprintf('UPDATE %s SET read_at = ? WHERE id IN (%s) AND %s AND %s', $this->table, $marks, $where, $state),
+            [$readAt instanceof DateTimeImmutable ? $this->utc($readAt) : null, ...array_values($ids), ...$values],
+        );
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function unreadIds(RecipientRef $recipient, Visibility $visibility, ?string $afterId, int $limit): array
+    {
+        $connection       = $this->transactions->connection();
+        [$where, $values] = $this->exact($connection, ['recipient_type' => $recipient->type, 'recipient_id' => $recipient->id]);
+        [$visible, $more] = $this->visible($connection, $visibility);
+        $where .= ' AND read_at IS NULL AND ' . $visible;
+        $values = [...$values, ...$more];
+        if ($afterId !== null) {
+            $where .= ' AND id > ?';
+            $values[] = $afterId;
+        }
+        $rows = $connection->fetchAllAssociative(sprintf('SELECT id, recipient_type, recipient_id, context_type, context_id, type FROM %s WHERE %s ORDER BY id LIMIT %d', $this->table, $where, $limit), $values);
+        $ids  = [];
+        $last = null;
+        foreach ($rows as $row) {
+            $last = (string) $row['id'];
+            if ($this->owns($row, $recipient) && $this->allows($visibility, $row)) {
+                $ids[] = $last;
+            }
+        }
+
+        return [$ids, count($rows) >= $limit ? $last : null];
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function statistics(DateTimeImmutable $since, DateTimeImmutable $now, int $types): InboxStatistics
+    {
+        $connection = $this->transactions->connection();
+        $totals     = $connection->fetchAssociative(sprintf('SELECT COUNT(*) AS total, SUM(CASE WHEN read_at IS NULL THEN 1 ELSE 0 END) AS unread FROM %s', $this->table));
+        $markers    = $connection->fetchOne(sprintf('SELECT COUNT(*) FROM %s WHERE expires_at > ?', $this->dedupeTable), [$this->utc($now)]);
+        $byType     = [];
+        foreach ($connection->fetchAllAssociative(
+            sprintf('SELECT type, COUNT(*) AS n FROM %s WHERE first_created_at >= ? GROUP BY type ORDER BY n DESC, type LIMIT %d', $this->table, $types),
+            [$this->utc($since)],
+        ) as $row) {
+            $byType[(string) $row['type']] = (int) $row['n'];
+        }
+
+        return new InboxStatistics(
+            is_array($totals) && is_numeric($totals['total']) ? (int) $totals['total'] : 0,
+            is_array($totals) && is_numeric($totals['unread']) ? (int) $totals['unread'] : 0,
+            is_numeric($markers) ? (int) $markers : 0,
+            $byType,
+        );
+    }
+
+    /**
+     * The read-time visibility as SQL (contract §6.1): personal rows, plus the rows of each granted context whose type
+     * is one of the granted types there; identifier equality exact as in {@see self::exact()}. The rows read are
+     * re-checked in PHP ({@see self::allows()}).
+     *
+     * @return array{string, list<string>}
+     */
+    private function visible(Connection $connection, Visibility $visibility): array
+    {
+        if ($visibility->unrestricted) {
+            return ['1 = 1', []];
+        }
+        $parts  = ['context_type IS NULL'];
+        $values = [];
+        foreach ($visibility->contexts() as $visible) {
+            [$where, $more] = $this->exact($connection, ['context_type' => $visible->context->type, 'context_id' => $visible->context->id]);
+            $parts[]        = sprintf('(%s AND type IN (%s))', $where, implode(', ', array_fill(0, count($visible->types), '?')));
+            $values         = [...$values, ...$more, ...$visible->types];
+        }
+
+        return ['(' . implode(' OR ', $parts) . ')', $values];
+    }
+
+    /**
+     * Whether a fetched row belongs to $recipient (`===`, audit LQ).
+     *
+     * @param array<string, mixed> $row
+     */
+    private function owns(array $row, RecipientRef $recipient): bool
+    {
+        return $row['recipient_type'] === $recipient->type && $row['recipient_id'] === $recipient->id;
+    }
+
+    /**
+     * The PHP re-check of the visibility of a fetched row.
+     *
+     * @param array<string, mixed> $row
+     */
+    private function allows(Visibility $visibility, array $row): bool
+    {
+        if ($row['context_type'] === null || $row['context_id'] === null) {
+            return true;
+        }
+        try {
+            $context = new ContextRef((string) $row['context_type'], (string) $row['context_id']);
+        } catch (InvalidNotificationArgumentException) {
+            // A stored context the value object refuses today: hidden for everyone (fail closed).
+            return false;
+        }
+
+        return $visibility->allows($context, (string) $row['type']);
     }
 
     /**

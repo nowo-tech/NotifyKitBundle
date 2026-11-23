@@ -149,8 +149,8 @@ jobs:
         if: env.HEAVY == 'true'
         run: |
           req=""; dev=""
-          for p in $(jq -r '.require | keys[] | select(startswith("symfony/")) | select(endswith("-contracts") | not)' composer.json); do req="$req $p:^${{ matrix.symfony }}"; done
-          for p in $(jq -r '."require-dev" | keys[] | select(startswith("symfony/")) | select(endswith("-contracts") | not)' composer.json); do dev="$dev $p:^${{ matrix.symfony }}"; done
+          for p in $(jq -r '.require | keys[] | select(startswith("symfony/")) | select(endswith("-contracts") | not) | select(. != "symfony/mercure")' composer.json); do req="$req $p:^${{ matrix.symfony }}"; done
+          for p in $(jq -r '."require-dev" | keys[] | select(startswith("symfony/")) | select(endswith("-contracts") | not) | select(. != "symfony/mercure")' composer.json); do dev="$dev $p:^${{ matrix.symfony }}"; done
           composer require $req --no-interaction --no-update
           composer require --dev $dev --no-interaction --no-update
           composer update "symfony/*" "doctrine/*" "twig/*" "nowo-tech/*" --with-all-dependencies --no-interaction --prefer-dist --no-progress
@@ -392,6 +392,41 @@ jobs:
           fail_ci_if_error: false
 
   # REQ-TEST-011: boot the FrankenPHP demo (MySQL) and expect HTTP 200 on every push / PR.
+  typescript:
+    name: TypeScript (bell script)
+    runs-on: ubuntu-latest
+    needs: changes
+    # Light mode: skipped (a skipped non-matrix job reports its own name as skipped, accepted by branch protection).
+    if: ${{ !cancelled() && needs.changes.outputs.mode != 'light' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm run typecheck
+
+      # REQ-TEST-003: Vitest thresholds (statements, branches, functions, lines >= 90 %) fail the run below the gate.
+      - name: Vitest with coverage (>= 90 %)
+        run: pnpm run test:coverage
+
+      # The committed script (src/Resources/public/js) must be the build of the TypeScript source.
+      - name: Check the committed script matches the build
+        run: |
+          pnpm run build
+          git diff --exit-code -- src/Resources/public/js
+
   demo-smoke:
     name: Demo smoke (symfony8, HTTP 200)
     runs-on: ubuntu-latest

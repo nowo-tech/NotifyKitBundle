@@ -33,10 +33,10 @@ abstract class KernelTestCase extends TestCase
      * @param array<string, mixed> $config `nowo_notify_kit` configuration
      * @param (Closure(ContainerConfigurator, string): void)|null $configure
      */
-    protected function bootKernel(array $config = [], ?string $databaseUrl = null, ?Closure $configure = null, bool $notifyRoute = false): TestKernel
+    protected function bootKernel(array $config = [], ?string $databaseUrl = null, ?Closure $configure = null, bool $notifyRoute = false, bool $web = false): TestKernel
     {
         $id              = $this->kernelId(count($this->kernels));
-        $kernel          = new TestKernel($id, $config, $databaseUrl, $configure, $notifyRoute);
+        $kernel          = new TestKernel($id, $config, $databaseUrl, $configure, $notifyRoute, null, $web);
         $this->kernels[] = $kernel;
         $kernel->boot();
 

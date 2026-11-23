@@ -17,6 +17,8 @@ test.describe('NotifyKitBundle demo', () => {
     await expect(status).toBeVisible();
     await expect(status).toContainText('NowoNotifyKitBundle');
     await expect(status).toContainText('MySQL');
+    await expect(page.locator('[data-testid="demo-sign-in"]')).toBeVisible();
+    await expect(page.locator('[data-testid="notify-kit-bell"]')).toHaveCount(0);
     await expect(status).toContainText('worker mode');
     expect(errors.filter((e) => !/favicon|mercure|EventSource/i.test(e))).toEqual([]);
   });

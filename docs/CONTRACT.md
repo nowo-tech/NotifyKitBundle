@@ -6,7 +6,7 @@
 
 # Contract 221-B: in-app notification inbox and per-user preferences (NotifyKitBundle). Contract v0.1 for symfony-beacon and the matrix apps
 
-Status 2026-11-23: **v0.1 contract; implementation in progress (2026-11-23).** Owner Q-O and Beacon Q-B answered as recommended. Slice S1 released as `v0.1.0`; `v0.1.1` and `v0.2.0` are maintenance and concurrency releases; S2 to S6 not started. See [ROADMAP.md](ROADMAP.md).
+Status 2026-11-23: **v0.1 contract; implementation in progress (2026-11-23).** Owner Q-O and Beacon Q-B answered as recommended. Slice S1 released as `v0.1.0`; `v0.1.1` and `v0.2.0` are maintenance and concurrency releases; S2 in review (2026-11-23); S3 to S6 not started. See [ROADMAP.md](ROADMAP.md).
 The original status line was: design only, no code, no repository, no PR,
 no tag. The owner approved the extraction on 2026-11-11 (Beacon request
 `docs/ops/BUNDLES-REQUESTS/2026-11-11-reaudit-extraction-candidates.md`, item 2). Sibling contracts in this folder:

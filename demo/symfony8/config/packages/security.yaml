@@ -1,0 +1,24 @@
+# Demo people (no passwords, no forms of their own): "Sign in as" on the home page logs in through
+# App\Security\DemoAuthenticator. Alice holds ROLE_ADMIN (operator page) and may open project "demo"; Bob may not.
+security:
+  providers:
+    demo_users:
+      memory:
+        users:
+          alice: { roles: ['ROLE_USER', 'ROLE_ADMIN'] }
+          bob: { roles: ['ROLE_USER'] }
+  firewalls:
+    dev:
+      pattern: ^/(_profiler|_wdt|_twig_inspector|bundles)/
+      security: false
+    main:
+      lazy: true
+      provider: demo_users
+      custom_authenticators: [App\Security\DemoAuthenticator]
+      logout:
+        path: demo_logout
+        target: demo_home
+  # Layer 1 of REQ-UI-002 (the bundle's access checkers are layer 2).
+  access_control:
+    - { path: ^/admin/notifications, roles: ROLE_ADMIN }
+    - { path: ^/notifications, roles: ROLE_USER }

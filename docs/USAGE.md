@@ -1,8 +1,9 @@
 # Usage
 
-> **S1 (core inbox, 0.1.0).** `notify()` writes the in-app rows; the bell, the inbox page and the read side
-> (`InboxInterface` unread count, pages, mark read) arrive with S2, preferences with S3, mail / push / Slack with S4.
-> Each section says from which slice it works (contract 221-B §3–§4).
+> **S1 (core inbox, 0.1.0) + S2 (access + UI).** `notify()` writes the in-app rows; S2 adds the read side
+> (`InboxInterface` unread count, pages, mark read / unread / all, with the visibility re-check), the header bell, the
+> inbox and operator pages and the realtime badge. Preferences come with S3, mail / push / Slack with S4. Each section
+> says from which slice it works (contract 221-B §3–§4).
 
 ## Table of contents
 
@@ -10,6 +11,11 @@
 - [What notify() does](#what-notify-does)
 - [Access: rows with a context](#access-rows-with-a-context)
 - [Transactions, failures and events](#transactions-failures-and-events)
+- [Inbox, bell and pages (S2)](#inbox-bell-and-pages-s2)
+- [Reading the inbox from code (S2)](#reading-the-inbox-from-code-s2)
+- [Realtime badge (S2)](#realtime-badge-s2)
+  - [The Mercure subscriber cookie](#the-mercure-subscriber-cookie)
+  - [What publishing costs](#what-publishing-costs)
 - [Retention and schema check](#retention-and-schema-check)
 - [Using it from a DDD / hexagonal application](#using-it-from-a-ddd--hexagonal-application)
 - [FrankenPHP worker mode](#frankenphp-worker-mode)
@@ -52,7 +58,7 @@
    ));
    ```
 
-4. Turn the pages on (S2): `web_ui.enabled: true` gives the inbox page, the bell fragment and the count endpoint.
+4. Turn the pages on (S2): see [Inbox, bell and pages](#inbox-bell-and-pages-s2).
 
 ## What notify() does
 
@@ -115,6 +121,124 @@ foreign key (Q-B6). From S2 the inbox also hides rows whose context the recipien
   | `Contract\Event\NotificationRecordedEvent` | `notificationId`, `recipient`, `type`, `context`, `coalesced` |
   | `Contract\Event\NotificationSkippedEvent` | `type`, `recipient`, `reason` (`actor`, `access`, `preference`, `dedupe`; `inactive` from S2) |
 
+## Inbox, bell and pages (S2)
+
+```yaml
+# config/packages/nowo_notify_kit.yaml
+nowo_notify_kit:
+    enabled: true
+    recipient: { class: App\Entity\User }        # or resolver: your RecipientResolverInterface service
+    web_ui:
+        enabled: true                              # /notifications, /notifications/menu, /count, POST read / unread / read-all
+        # path_prefix: /notifications
+        # security: { access_roles: [ROLE_USER], access_checker: null }
+    admin_ui:
+        enabled: true                              # /admin/notifications: counts only, "Run retention now"
+        # security: { access_roles: [ROLE_ADMIN], access_checker: null, allow_unauthenticated: false }
+
+# config/routes/nowo_notify_kit.yaml
+nowo_notify_kit:
+    resource: '@NowoNotifyKitBundle/Resources/config/routes.php'
+
+# config/packages/security.yaml (layer 1 of REQ-UI-002; the bundle's access checkers are layer 2)
+security:
+    access_control:
+        - { path: ^/admin/notifications, roles: ROLE_ADMIN }
+        - { path: ^/notifications, roles: ROLE_USER }
+```
+
+Then render the bell in your header (it renders nothing for guests or people without inbox access) and run
+`php bin/console assets:install`:
+
+```twig
+{# UiKit shell: the header actions slot #}
+{% block nowo_ui_shell_header_actions %}{{ notify_kit_bell() }}{{ parent() }}{% endblock %}
+```
+
+- **Who sees what.** Every endpoint resolves the logged-in person (`recipient.resolver` / `recipient.class`) and
+  works on that person's rows only. An id of someone else's row, or of a row they may no longer see, answers 404.
+  Anonymous requests get your firewall's login answer (401 / redirect); a person without one of
+  `web_ui.security.access_roles` (or refused by your `InboxAccessCheckerInterface`) gets 403.
+- **CSRF.** The bell's `fetch` calls send the token `nowo_notify_kit_inbox` in `X-CSRF-TOKEN` and get JSON
+  (`{ok, id, unread, unreadCount}`, `{ok, marked, unreadCount}`); the inbox page uses FormKit forms (`_token`,
+  `_redirect`) and redirects to `_redirect` only when it is a local path (checked before and after URL-decoding).
+  Without a valid token: 403.
+- **Caching.** The inbox page, menu, count and every JSON answer send `Cache-Control: no-store, private`; the count has
+  an `ETag` and answers `304` when it did not change.
+- **Lock conflicts** answer **409** + `Retry-After` + `CONFLICT_001` (JSON for `fetch`, your error page for forms).
+  Every row operation is idempotent: retrying is safe.
+- **Without JavaScript** the bell is a `<details>` disclosure whose panel links to the inbox page; the inbox page
+  works with plain forms.
+- **Titles** are built at display time in the viewer's language: the type's `title_key` in its `title_domain`
+  (default `messages`) with each param as `%<key>%`, then `%actor%` (the actor's name from
+  `RecipientDirectoryInterface`; "Someone" when unknown or erased), `%target%` and `%repeats%`, which a param cannot
+  override. Unknown types get the generic title. Context labels come from your `ContextProviderInterface`
+  (`preferences.contexts.provider`).
+- Templates and overrides: [TEMPLATES.md](TEMPLATES.md).
+
+## Reading the inbox from code (S2)
+
+```php
+use Nowo\NotifyKitBundle\Contract\InboxFilter;
+use Nowo\NotifyKitBundle\Contract\InboxInterface;
+use Nowo\NotifyKitBundle\Contract\InboxStatus;
+
+$unread = $inbox->unreadCount($me);
+$page   = $inbox->page($me, new InboxFilter(status: InboxStatus::Unread), $after, 25); // $page->items, $page->next
+$inbox->markRead($me, $page->items[0]->id);   // false = not my row, or hidden from me (answer 404)
+$inbox->markAllRead($me);                     // visible rows only
+```
+
+Visibility is re-checked on every call: personal rows always; a row with a context only while your
+`RecipientAccessCheckerInterface` still grants the type's permission there (asked once per permission with every
+context of the person's rows). A lost permission hides the rows and lowers the count at once, before you call
+`forgetContext()`. `NotificationReadEvent` (ids only) is dispatched after the update commits, and only when something
+changed (`all: true` for *mark all*, `read: false` for *mark unread*).
+
+## Realtime badge (S2)
+
+| `realtime.mode` | What happens |
+| --- | --- |
+| `auto` (default) | `mercure` when a Mercure hub service exists (MercureBundle), else `poll` |
+| `mercure` | After each commit, one **private** update per recipient on `notify-kit/r/<hmac>` (HMAC-SHA256 of the recipient key with `kernel.secret`), payload `{"event":"notify.updated","unread":n}` only. The bell sets the subscriber cookie for the person's own topic (MercureBundle `Authorization`, see [the subscriber cookie](#the-mercure-subscriber-cookie)). The bell falls back to polling when the cookie cannot be set while the page renders (a hub on another site, or the `__Secure-` cookie of symfony/mercure 0.10 on plain HTTP), and in the browser when the stream fails: closed by the hub, or 3 errors in a row (an expired or replaced cookie, a hub answering 401). It then polls `…/count` once at once and every `realtime.poll_seconds` after. Without a hub the container refuses to build |
+| `poll` | The bell polls `…/count` every `realtime.poll_seconds` (≥ 10), paused while the tab is hidden |
+| `off` | No updates; the count refreshes on the next page |
+
+With `realtime.publisher` your own `RealtimePublisherInterface` service is called instead (Beacon keeps its topic,
+Q-B3); dispatch `nowo-notify-kit:updated` on `document` with `detail: {unread: n}` to update the bell. A failing
+publisher is logged and never fails the request.
+
+### The Mercure subscriber cookie
+
+A hub path has **one** subscriber cookie (`mercureAuthorization`). symfony/mercure 0.10 (required: the bundle conflicts
+with older versions) merges the grants of every `setCookie()` in the same request, so the bell and your own
+`mercure(…, {subscribe: …})` share one cookie on a page that renders both. **Across requests they replace each other**:
+a page with the bell overwrites a cookie you set on an earlier request (for example a token endpoint of a co-editing
+page), and your cookie overwrites the bell's. Whichever stream reconnects next loses its grant; the bell then polls (see
+above). Two ways to avoid it:
+
+- Grant the bell's topic yourself wherever you set the cookie: add `RealtimeTopics::subscribeClaimFor($recipient)` to
+  your subscribe list.
+- Or set `realtime.subscriber_cookie: false`: the bell sets no cookie and expects your JWT (cookie or
+  `Authorization` header) to hold `subscribeClaimFor()`.
+
+The bell's grant is always the person's own topic only.
+
+### What publishing costs
+
+Publishing is synchronous, after the commit: per written recipient one visibility check (one query plus one access
+checker call per permission), one unread count and one HTTP call to the hub. `notify()` for 1,000 recipients makes
+1,000 hub calls. The first failure (hub down, timeout) stops the badges for the rest of that call, so a dead hub costs
+one timeout per call, not one per recipient; those bells catch up on the next change or page load. To keep the hub off
+the request:
+
+- Give the HTTP client that publishes to your hub a short `timeout` / `max_duration`.
+- Or publish through Messenger: a `realtime.publisher` service that dispatches
+  `new Update($topics->topicFor($recipient), json_encode(['event' => 'notify.updated', 'unread' => $unread]), true)`
+  on the bus, with `Symfony\Component\Mercure\Update` routed to an async transport (symfony/mercure's `UpdateHandler`
+  sends it).
+- Or `realtime.mode: poll` / `off`.
+
 ## Retention and schema check
 
 - `php bin/console nowo:notify-kit:prune` deletes read rows created more than `retention.read_days` (90) ago (unread
@@ -145,6 +269,12 @@ foreign key (Q-B6). From S2 the inbox also hides rows whose context the recipien
 Both host kinds run the same functional suite (`tests/Integration/Database/StandardHostTest.php`, `DddHostTest.php`).
 
 ## FrankenPHP worker mode
+
+Events of a call made inside your transaction run after the outermost commit at the next safe point (the bundle's
+next call at level 0, or the request / command / message boundary at the latest, audit QL-I5). A host that commits in
+`kernel.terminate` after the main `finish_request` gets its events at `kernel.terminate`; long console batches hold
+them until `console.terminate` unless the bundle is called again at level 0.
+
 
 Every service is stateless except the after-commit queue, which holds the events of a transaction that joined a host
 transaction and is cleared at every request, command and message boundary (and on `kernel.reset`). See

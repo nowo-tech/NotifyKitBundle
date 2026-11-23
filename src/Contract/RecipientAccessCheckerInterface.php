@@ -10,7 +10,8 @@ use Nowo\NotifyKitBundle\Application\Default\PersonalOnlyAccessChecker;
  * Host SPI (`access.checker`): may this person open targets in a context? Deny by default (contract §6.1): a row with
  * a context is written only when the checker grants the type's permission there. The default,
  * {@see PersonalOnlyAccessChecker}, grants nothing, so only personal rows
- * (no context) are written. From S2 the same checker filters the inbox at read time.
+ * (no context) are written. The same checker filters the inbox at read time (S2): it is asked once per permission
+ * with every context of the recipient's rows, so a lost permission hides the rows at once.
  *
  * Implementations are stateless or reset per request (worker mode): they are asked once per recipient and request.
  */

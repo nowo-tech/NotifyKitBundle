@@ -1,0 +1,50 @@
+{#
+  Inbox page (contract §8.2, REQ-UI-003): UiKit list scaffold. Variables: page (Nowo\UiKitBundle\View\ListPage; rows:
+  Presentation\View\InboxRow), next_href / first_href (keyset pages, null when none).
+  Header action (mark all as read), filters (type, category, status), table frame, row actions (open; mark read / mark
+  unread as CSRF forms), empty state come from the scaffold; this template fills the row cells (nowo_ui_list_row), the
+  keyset navigation (nowo_notify_kit_pager inside nowo_ui_list_after) and adds the bundle stylesheet. Values are plain
+  text printed escaped; titles and context labels sit in <bdi dir="auto">.
+
+  Override: a template that extends '@!NowoNotifyKitBundle/inbox/index.html.twig' and overrides one of these blocks, or
+  web_ui.templates.inbox. Restyle through nowo_ui_kit.theme (slots), never here.
+#}
+{% extends '@NowoUiKitBundle/page/list.html.twig' %}
+
+{% block nowo_ui_styles %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('css/nowo-notify-kit.css', 'nowo_notify_kit') }}">
+{% endblock %}
+
+{% block nowo_ui_list_row %}
+    {%- set _b = page.bundle -%}
+    {%- set _cell = nowo_ui_class('table_cell', _b) -%}
+    {%- set _n = row.notification -%}
+    {%- set _d = 'NowoNotifyKitBundle' -%}
+    <td class="{{ _cell }} nowo-ui-cell--start" data-label="{{ 'notify.column.notification'|trans({}, _d) }}" data-nowo-ui-phone="primary" data-icon="{{ row.icon }}">
+        <a href="{{ _n.url }}"><bdi dir="auto">{{ row.title }}</bdi></a>
+        {%- if row.context %}<br><small><bdi dir="auto">{{ row.context }}</bdi></small>{% endif -%}
+        {%- if _n.repeats > 1 %} <small>({{ 'notify.item.repeats'|trans({'%count%': _n.repeats}, _d) }})</small>{% endif %}
+    </td>
+    <td class="{{ _cell }} nowo-ui-cell--start" data-label="{{ 'notify.column.when'|trans({}, _d) }}" data-nowo-ui-priority="2">
+        <time datetime="{{ _n.createdAt|date('c', 'UTC') }}" title="{{ _n.createdAt|date('Y-m-d H:i', 'UTC') }} UTC">{{ row.when }}</time>
+    </td>
+    <td class="{{ _cell }} nowo-ui-cell--start" data-label="{{ 'notify.column.status'|trans({}, _d) }}">
+        {%- if row.isUnread -%}
+            <span class="{{ nowo_ui_class('badge_info', _b) }}" data-testid="notify-kit-state-{{ _n.id.value }}"><span class="nowo-notify-kit-dot" aria-hidden="true"></span>{{ 'notify.status.unread'|trans({}, _d) }}</span>
+        {%- else -%}
+            <span class="{{ nowo_ui_class('badge_neutral', _b) }}" data-testid="notify-kit-state-{{ _n.id.value }}">{{ 'notify.status.read'|trans({}, _d) }}</span>
+        {%- endif -%}
+    </td>
+{% endblock %}
+
+{% block nowo_ui_list_after %}
+    {% block nowo_notify_kit_pager %}
+        {% if first_href|default(null) or next_href|default(null) %}
+            <nav class="{{ nowo_ui_class('toolbar', page.bundle) }}" aria-label="{{ 'notify.inbox.pages'|trans({}, 'NowoNotifyKitBundle') }}">
+                {% if first_href|default(null) %}<a class="{{ nowo_ui_class('btn_secondary', page.bundle) }}" href="{{ first_href }}" data-testid="notify-kit-first">{{ 'notify.inbox.first_page'|trans({}, 'NowoNotifyKitBundle') }}</a>{% endif %}
+                {% if next_href|default(null) %}<a class="{{ nowo_ui_class('btn_secondary', page.bundle) }}" href="{{ next_href }}" rel="next" data-testid="notify-kit-next">{{ 'notify.inbox.load_more'|trans({}, 'NowoNotifyKitBundle') }}</a>{% endif %}
+            </nav>
+        {% endif %}
+    {% endblock %}
+{% endblock %}

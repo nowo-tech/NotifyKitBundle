@@ -6,13 +6,14 @@ namespace Nowo\NotifyKitBundle\Tests\Fixtures\Standard;
 
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Stringable;
 
 /**
  * Standard host user: an attribute-mapped entity with a string id.
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'app_user')]
-class User
+class User implements Stringable
 {
     public function __construct(
         #[ORM\Id]
@@ -21,5 +22,10 @@ class User
         #[ORM\Column(type: Types::STRING, length: 64)]
         public string $name = 'someone',
     ) {
+    }
+
+    public function __toString(): string
+    {
+        return $this->name;
     }
 }

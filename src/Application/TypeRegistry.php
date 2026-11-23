@@ -52,7 +52,7 @@ final readonly class TypeRegistry implements TypeRegistryInterface
     /**
      * Builds the registry from the processed `types` / `categories` configuration and the tagged providers.
      *
-     * @param array<string, array{category: string, icon: string|null, title_key: string|null, permission: string|null, channels: array<string, bool>, in_app_optional: bool, locked_channels: list<string>, urgency: string, coalesce: bool, in_matrix: bool}> $types
+     * @param array<string, array{category: string, icon: string|null, title_key: string|null, title_domain?: string|null, permission: string|null, channels: array<string, bool>, in_app_optional: bool, locked_channels: list<string>, urgency: string, coalesce: bool, in_matrix: bool}> $types
      * @param array<string, array{label: string, group: string, order: int}> $categories
      * @param iterable<TypeProviderInterface> $providers
      * @param bool $hasAccessChecker whether the host configured `access.checker`
@@ -77,6 +77,7 @@ final readonly class TypeRegistry implements TypeRegistryInterface
                 Urgency::from($type['urgency']),
                 $type['coalesce'],
                 $type['in_matrix'],
+                $type['title_domain'] ?? null,
             );
         }
         foreach ($providers as $provider) {

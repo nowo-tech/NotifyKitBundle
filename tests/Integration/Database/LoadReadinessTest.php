@@ -7,6 +7,8 @@ namespace Nowo\NotifyKitBundle\Tests\Integration\Database;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
+use Nowo\NotifyKitBundle\Contract\InboxInterface;
+use Nowo\NotifyKitBundle\Contract\NotificationId;
 use Nowo\NotifyKitBundle\Contract\NotificationRequest;
 use Nowo\NotifyKitBundle\Contract\NotifierInterface;
 use Nowo\NotifyKitBundle\Contract\RecipientRef;
@@ -23,6 +25,7 @@ use function array_key_last;
 use function array_map;
 use function array_sum;
 use function fclose;
+use function intdiv;
 use function preg_match;
 use function proc_close;
 use function proc_open;
@@ -42,7 +45,10 @@ use const PHP_BINARY;
  * - concurrent writers of the same recipient and target never lose a repeat (the count is incremented in SQL on a
  *   locked row) and never fail;
  * - dedupe claims take no gap lock: two open transactions claim two fresh keys without waiting, and concurrent writers
- *   claiming the same keys never fail and claim each key once (audit QL-L1).
+ *   claiming the same keys never fail and claim each key once (audit QL-L1);
+ * - S2 row operations: *mark read* waiting on a row a repeat holds is transient (CONFLICT_001, nothing written, level
+ *   0) and the retry succeeds; *mark all as read* running against concurrent repeats never loses a repeat (conditional
+ *   `UPDATE … WHERE read_at IS NULL`, no read-modify-write).
  */
 final class LoadReadinessTest extends KernelTestCase
 {
@@ -172,6 +178,64 @@ final class LoadReadinessTest extends KernelTestCase
         self::assertSame(self::DEDUPE_KEYS, $claimed, 'every key is claimed exactly once');
     }
 
+    public function testAMarkReadWaitingOnALockedRowIsTransientAndTheRetrySucceeds(): void
+    {
+        $host   = Host::standard();
+        $holder = $this->bootKernel($host->bundleConfig(), Host::databaseUrl(), $host->configure());
+        $host->resetSchema($holder);
+        $waiter = $this->bootKernel($host->bundleConfig(), Host::databaseUrl(), $host->configure());
+        $a      = new RecipientRef('user', 'a');
+        $repeat = static fn (): NotificationRequest => new NotificationRequest('invitation_accepted', [$a], null, null, 'invite:1', '/a');
+        $id     = $this->notifier($holder)->notify($repeat())->notificationIds[0];
+
+        $holding = $this->connection($holder);
+        $holding->beginTransaction();
+        self::assertSame(1, $this->notifier($holder)->notify($repeat())->coalesced, 'the holder locks the unread row');
+        $waiting = $this->connection($waiter);
+        $waiting->executeStatement($waiting->getDatabasePlatform() instanceof AbstractMySQLPlatform ? 'SET SESSION innodb_lock_wait_timeout = 1' : "SET lock_timeout = '1s'");
+        try {
+            $this->inbox($waiter)->markRead($a, $id);
+            self::fail('the waiter must time out');
+        } catch (TransientStorageFailure $failure) {
+            self::assertSame(ConflictCode::RetrySafe, ConflictCode::forFailure($failure), 'nothing was committed: CONFLICT_001 with Retry-After');
+        }
+        self::assertSame(0, $waiting->getTransactionNestingLevel());
+        self::assertNull($waiting->fetchOne('SELECT read_at FROM nowo_notify_notification'), 'nothing written');
+
+        $holding->commit();
+        self::assertTrue($this->inbox($waiter)->markRead($a, $id));
+        self::assertSame(0, $this->inbox($waiter)->unreadCount($a));
+        self::assertSame(2, (int) $waiting->fetchOne('SELECT repeats FROM nowo_notify_notification'), 'the repeat is kept');
+        self::assertInstanceOf(NotificationId::class, $id);
+    }
+
+    public function testMarkAllReadAgainstConcurrentRepeatsNeverLosesARepeat(): void
+    {
+        $host   = Host::standard();
+        $kernel = $this->bootKernel($host->bundleConfig(), Host::databaseUrl(), $host->configure());
+        $host->resetSchema($kernel);
+        $kernel->shutdown();
+
+        $processes = [];
+        for ($i = 0; $i < self::WRITERS; ++$i) {
+            $script = $i % 2 === 0 ? 'concurrent-writer.php' : 'mark-reader.php';
+            // @phpstan-ignore-next-line Test harness only: bounded loops, proc_close() waits for each.
+            $process = proc_open([PHP_BINARY, __DIR__ . '/Support/' . $script, $this->kernelId(0), Host::databaseUrl(), (string) self::REPEATS], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+            self::assertIsResource($process);
+            $processes[] = [$process, $pipes];
+        }
+        foreach ($processes as [$process, $pipes]) {
+            $output = stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            self::assertSame(0, proc_close($process), sprintf('process output: %s', $output));
+        }
+
+        $check = $this->bootKernel($host->bundleConfig(), Host::databaseUrl(), $host->configure());
+        $rows  = $this->connection($check)->fetchFirstColumn('SELECT repeats FROM nowo_notify_notification');
+        self::assertSame(intdiv(self::WRITERS, 2) * self::REPEATS, array_sum(array_map('intval', $rows)), 'every repeat is counted, read or not');
+    }
+
     private function store(TestKernel $kernel): NotificationStoreInterface
     {
         $container = $kernel->getContainer()->get('test.service_container');
@@ -180,6 +244,14 @@ final class LoadReadinessTest extends KernelTestCase
         self::assertInstanceOf(NotificationStoreInterface::class, $store);
 
         return $store;
+    }
+
+    private function inbox(TestKernel $kernel): InboxInterface
+    {
+        $inbox = $kernel->getContainer()->get(InboxInterface::class);
+        self::assertInstanceOf(InboxInterface::class, $inbox);
+
+        return $inbox;
     }
 
     private function notifier(TestKernel $kernel): NotifierInterface

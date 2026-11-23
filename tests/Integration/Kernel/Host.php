@@ -8,6 +8,7 @@ use Closure;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\Persistence\ManagerRegistry;
+use Nowo\NotifyKitBundle\Contract\Event\NotificationReadEvent;
 use Nowo\NotifyKitBundle\Contract\Event\NotificationRecordedEvent;
 use Nowo\NotifyKitBundle\Contract\Event\NotificationSkippedEvent;
 use Nowo\NotifyKitBundle\Contract\RecipientRef;
@@ -17,6 +18,7 @@ use Nowo\NotifyKitBundle\Tests\Fixtures\Ddd\MemberRecipientResolver;
 use Nowo\NotifyKitBundle\Tests\Fixtures\FlushSpy;
 use Nowo\NotifyKitBundle\Tests\Fixtures\ProjectAccessChecker;
 use Nowo\NotifyKitBundle\Tests\Fixtures\RecordingListener;
+use Nowo\NotifyKitBundle\Tests\Fixtures\RecordingPublisher;
 use Nowo\NotifyKitBundle\Tests\Fixtures\Standard\User;
 use Nowo\NotifyKitBundle\Tests\Fixtures\TestTypeProvider;
 use Symfony\Component\Clock\MockClock;
@@ -148,7 +150,9 @@ final readonly class Host
             $container->services()->set('clock', MockClock::class)->args([self::NOW, 'UTC'])->public();
             $container->services()->set(RecordingListener::class)->public()
                 ->tag('kernel.event_listener', ['event' => NotificationRecordedEvent::class, 'method' => 'onEvent'])
-                ->tag('kernel.event_listener', ['event' => NotificationSkippedEvent::class, 'method' => 'onEvent']);
+                ->tag('kernel.event_listener', ['event' => NotificationSkippedEvent::class, 'method' => 'onEvent'])
+                ->tag('kernel.event_listener', ['event' => NotificationReadEvent::class, 'method' => 'onEvent']);
+            $container->services()->set(RecordingPublisher::class)->public();
             $container->services()->set(FlushSpy::class)->public()->tag('doctrine.event_listener', ['event' => 'onFlush']);
             $container->services()->set(BinaryIdListener::class)->tag('doctrine.event_listener', ['event' => 'loadClassMetadata']);
         };

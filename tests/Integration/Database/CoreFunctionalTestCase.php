@@ -8,11 +8,16 @@ use Composer\InstalledVersions;
 use Doctrine\DBAL\Connection;
 use LogicException;
 use Nowo\NotifyKitBundle\Contract\ContextRef;
+use Nowo\NotifyKitBundle\Contract\Event\NotificationReadEvent;
 use Nowo\NotifyKitBundle\Contract\Event\NotificationRecordedEvent;
 use Nowo\NotifyKitBundle\Contract\Event\NotificationSkippedEvent;
 use Nowo\NotifyKitBundle\Contract\Exception\InvalidNotificationArgumentException;
+use Nowo\NotifyKitBundle\Contract\InboxFilter;
 use Nowo\NotifyKitBundle\Contract\InboxInterface;
+use Nowo\NotifyKitBundle\Contract\InboxStatus;
+use Nowo\NotifyKitBundle\Contract\NotificationId;
 use Nowo\NotifyKitBundle\Contract\NotificationRequest;
+use Nowo\NotifyKitBundle\Contract\NotificationView;
 use Nowo\NotifyKitBundle\Contract\NotifierInterface;
 use Nowo\NotifyKitBundle\Contract\RecipientRef;
 use Nowo\NotifyKitBundle\Contract\RecipientResolverInterface;
@@ -24,6 +29,7 @@ use Nowo\NotifyKitBundle\Infrastructure\Persistence\AfterCommitQueue;
 use Nowo\NotifyKitBundle\Tests\Fixtures\Ddd\Member;
 use Nowo\NotifyKitBundle\Tests\Fixtures\FlushSpy;
 use Nowo\NotifyKitBundle\Tests\Fixtures\RecordingListener;
+use Nowo\NotifyKitBundle\Tests\Fixtures\RecordingPublisher;
 use Nowo\NotifyKitBundle\Tests\Fixtures\Standard\User;
 use Nowo\NotifyKitBundle\Tests\Integration\Kernel\Host;
 use Nowo\NotifyKitBundle\Tests\Integration\Kernel\KernelTestCase;
@@ -441,6 +447,208 @@ abstract class CoreFunctionalTestCase extends KernelTestCase
         self::assertSame(3, $this->store()->countUnread($this->r('alice')));
     }
 
+    public function testThePageListsTheRecipientsRowsNewestFirstWithKeysetAndFilters(): void
+    {
+        $this->boot();
+        $a = $this->r('a');
+        $this->notifier()->notify(new NotificationRequest('invitation_accepted', [$a], $this->r('x'), null, 'invite:1', '/one', ['name' => 'Team']));
+        $this->clock()->sleep(5);
+        $this->notifier()->notify(new NotificationRequest('billing.ready', [$a, $this->r('b')], null, null, 'export:1', '/billing'));
+        $this->clock()->sleep(5);
+        $this->notifier()->notify(new NotificationRequest('invitation_accepted', [$a], null, null, 'invite:2', '/two'));
+
+        $first = $this->inbox()->page($a, InboxFilter::all(), null, 2);
+        self::assertSame(['/two', '/billing'], array_map(static fn (NotificationView $view): string => $view->url, $first->items));
+        self::assertNotNull($first->next);
+        self::assertFalse($first->items[0]->isRead());
+        self::assertTrue($first->items[0]->recipient->equals($a));
+        $second = $this->inbox()->page($a, InboxFilter::all(), $first->next, 2);
+        self::assertSame(['/one'], array_map(static fn (NotificationView $view): string => $view->url, $second->items));
+        self::assertNull($second->next);
+        self::assertSame(['name' => 'Team'], $second->items[0]->params);
+        self::assertSame('x', $second->items[0]->actor?->id);
+        self::assertCount(3, $this->inbox()->page($a, InboxFilter::all(), 'not-a-cursor', 10)->items, 'an invalid cursor is the first page');
+        self::assertCount(3, $this->inbox()->page($a, InboxFilter::all(), null, 1000)->items, 'the limit is clamped');
+
+        self::assertCount(1, $this->inbox()->page($a, new InboxFilter('billing.ready'), null, 10)->items);
+        self::assertCount(3, $this->inbox()->page($a, new InboxFilter(null, 'account'), null, 10)->items);
+        self::assertCount(0, $this->inbox()->page($a, new InboxFilter(null, 'other'), null, 10)->items);
+        $this->inbox()->markRead($a, $first->items[1]->id);
+        self::assertSame(['/two', '/one'], array_map(static fn (NotificationView $view): string => $view->url, $this->inbox()->page($a, new InboxFilter(null, null, InboxStatus::Unread), null, 10)->items));
+        $read = $this->inbox()->page($a, new InboxFilter(null, null, InboxStatus::Read), null, 10)->items;
+        self::assertSame(['/billing'], array_map(static fn (NotificationView $view): string => $view->url, $read));
+        self::assertTrue($read[0]->isRead());
+        self::assertSame(['/billing'], array_map(static fn (NotificationView $view): string => $view->url, $this->inbox()->page($this->r('b'), InboxFilter::all(), null, 10)->items), 'b sees only its own row');
+        self::assertSame(2, $this->inbox()->unreadCount($a));
+    }
+
+    public function testRowOperationsOnlyTouchTheRecipientsRowsAndAnnounceAfterTheCommit(): void
+    {
+        $this->boot(['retention' => ['batch_size' => 2], 'realtime' => ['publisher' => RecordingPublisher::class]]);
+        $a   = $this->r('a');
+        $b   = $this->r('b');
+        $ids = $this->notifier()->notify(new NotificationRequest('billing.ready', [$a, $b], null, null, 'export:1', '/billing'))->notificationIds;
+        self::assertSame([[$a->key(), 1], [$b->key(), 1]], $this->publisher()->published, 'notify() publishes each written recipient\'s count');
+        $this->publisher()->published = [];
+        $this->listener()->clear();
+        [$mine, $theirs] = $ids;
+
+        self::assertFalse($this->inbox()->markRead($b, $mine), 'a row of another recipient does not exist for b');
+        self::assertFalse($this->inbox()->markRead($a, new NotificationId('019a0000-0000-7000-8000-000000000001')));
+        self::assertTrue($this->inbox()->markRead($a, $mine));
+        self::assertTrue($this->inbox()->markRead($a, $mine), 'idempotent');
+        $events = $this->listener()->of(NotificationReadEvent::class);
+        self::assertCount(1, $events, 'only a change is announced');
+        self::assertSame($mine->value, $events[0]->ids[0]->value);
+        self::assertTrue($events[0]->read);
+        self::assertFalse($events[0]->all);
+        self::assertSame([[$a->key(), 0]], $this->publisher()->published);
+        self::assertSame(0, $this->inbox()->unreadCount($a));
+        self::assertSame(1, $this->inbox()->unreadCount($b), 'b is untouched');
+
+        self::assertTrue($this->inbox()->markUnread($a, $mine));
+        self::assertFalse($this->listener()->of(NotificationReadEvent::class)[1]->read);
+        self::assertFalse($this->inbox()->markUnread($b, $mine));
+        self::assertSame(1, $this->inbox()->unreadCount($a));
+
+        foreach (['2', '3', '4', '5'] as $n) {
+            $this->notifier()->notify(new NotificationRequest('billing.ready', [$a], null, null, 'export:' . $n, '/billing'));
+        }
+        $this->listener()->clear();
+        $this->publisher()->published = [];
+        self::assertSame(5, $this->inbox()->markAllRead($a), 'three batches of two');
+        $events = $this->listener()->of(NotificationReadEvent::class);
+        self::assertCount(1, $events, 'one announcement after the last batch');
+        self::assertTrue($events[0]->all);
+        self::assertSame([], $events[0]->ids);
+        self::assertSame([[$a->key(), 0]], $this->publisher()->published);
+        self::assertSame(0, $this->inbox()->markAllRead($a));
+        self::assertCount(1, $this->listener()->of(NotificationReadEvent::class), 'nothing changed: no event');
+        self::assertSame(1, $this->inbox()->unreadCount($b));
+        self::assertTrue($this->inbox()->markRead($b, $theirs));
+
+        $this->publisher()->fail = true;
+        self::assertTrue($this->inbox()->markUnread($b, $theirs), 'a failing publisher never fails the call');
+        self::assertSame(1, $this->inbox()->unreadCount($b));
+
+        $this->publisher()->attempts = 0;
+        $ids                         = $this->notifier()->notify(new NotificationRequest('billing.ready', [$a, $b, $this->r('c')], null, null, 'export:9', '/billing'))->notificationIds;
+        self::assertCount(3, $ids, 'every row is written');
+        self::assertSame(1, $this->publisher()->attempts, 'the first hub failure stops the badges of the rest of the call (audit ZAJ-3)');
+        $this->publisher()->fail = false;
+        $this->notifier()->notify(new NotificationRequest('billing.ready', [$a, $b], null, null, 'export:10', '/billing'));
+        self::assertSame(3, $this->publisher()->attempts, 'the next call publishes again');
+    }
+
+    public function testRowOperationsInsideARolledBackHostTransactionAnnounceNothing(): void
+    {
+        $this->boot();
+        $a  = $this->r('a');
+        $id = $this->notifier()->notify(new NotificationRequest('billing.ready', [$a], null, null, 'export:1', '/billing'))->notificationIds[0];
+        $this->listener()->clear();
+        $connection = $this->connection();
+        $connection->beginTransaction();
+        self::assertTrue($this->inbox()->markRead($a, $id));
+        self::assertSame([], $this->listener()->events);
+        $connection->rollBack();
+        self::assertSame([], $this->listener()->events, 'a rolled-back change is never announced');
+        self::assertSame(1, $this->inbox()->unreadCount($a));
+    }
+
+    public function testVisibilityIsCheckedAgainAtReadTime(): void
+    {
+        $this->boot();
+        $project = new ContextRef('project', '42');
+        if ($this->host()->kind === Host::STANDARD) {
+            // Personal rows only: a context row written behind the bundle's back stays hidden.
+            $this->notifier()->notify(new NotificationRequest('invitation_accepted', [$this->r('a')], null, null, 'i:1', '/i'));
+            $this->insertRow('a', 'invitation_accepted', $project);
+            self::assertSame(1, $this->inbox()->unreadCount($this->r('a')));
+            self::assertCount(1, $this->inbox()->page($this->r('a'), InboxFilter::all(), null, 10)->items);
+            self::assertFalse($this->inbox()->markRead($this->r('a'), new NotificationId($this->lastInsertedId)));
+            self::assertSame(1, $this->inbox()->markAllRead($this->r('a')));
+            self::assertSame(1, (int) $this->connection()->fetchOne(sprintf('SELECT COUNT(*) FROM %s WHERE read_at IS NULL', $this->table())), 'the hidden row stays unread');
+
+            return;
+        }
+
+        $m1 = $this->r('m-1');
+        $this->notifier()->notify(new NotificationRequest('issue.assigned', [$m1], null, $project, 'issue:1', '/p/42/issues/1'));
+        $this->notifier()->notify(new NotificationRequest('some.new_type', [$m1], null, $project, 'x:1', '/x'));
+        $this->notifier()->notify(new NotificationRequest('invitation_accepted', [$m1], null, null, 'i:1', '/i'));
+        self::assertSame(3, $this->inbox()->unreadCount($m1));
+
+        // Written before m-1 lost access: issue.view is not granted in project 7 any more.
+        $this->insertRow('m-1', 'issue.assigned', new ContextRef('project', '7'));
+        $hidden = new NotificationId($this->lastInsertedId);
+        // A personal type in a context is never visible; an unknown type needs the default permission there.
+        $this->insertRow('m-1', 'invitation_accepted', $project);
+        $this->insertRow('m-1', 'other.type', new ContextRef('board', '9'));
+        self::assertSame(3, $this->inbox()->unreadCount($m1), 'hidden rows do not count');
+        self::assertSame(['/i', '/x', '/p/42/issues/1'], array_map(static fn (NotificationView $view): string => $view->url, $this->inbox()->page($m1, InboxFilter::all(), null, 10)->items));
+        self::assertFalse($this->inbox()->markRead($m1, $hidden));
+        self::assertSame(3, $this->inbox()->markAllRead($m1));
+        self::assertSame(3, (int) $this->connection()->fetchOne(sprintf('SELECT COUNT(*) FROM %s WHERE read_at IS NULL', $this->table())), 'hidden rows stay unread');
+
+        // An unrestricted recipient sees every context.
+        $this->insertRow('admin', 'issue.assigned', new ContextRef('project', '7'));
+        $this->insertRow('admin', 'other.type', new ContextRef('board', '9'));
+        self::assertSame(2, $this->inbox()->unreadCount($this->r('admin')));
+        self::assertTrue($this->inbox()->markRead($this->r('admin'), new NotificationId($this->lastInsertedId)));
+    }
+
+    public function testLookAlikeRecipientsNeverCross(): void
+    {
+        $this->boot();
+        $lower = $this->r('usera');
+        $upper = $this->r('UserA');
+        $id    = $this->notifier()->notify(new NotificationRequest('billing.ready', [$upper], null, null, 'export:1', '/billing'))->notificationIds[0];
+        $this->notifier()->notify(new NotificationRequest('billing.ready', [$lower], null, null, 'export:1', '/billing'));
+
+        self::assertSame(1, $this->inbox()->unreadCount($lower));
+        self::assertCount(1, $this->inbox()->page($lower, InboxFilter::all(), null, 10)->items);
+        self::assertFalse($this->inbox()->markRead($lower, $id));
+        self::assertSame(1, $this->inbox()->markAllRead($lower));
+        self::assertSame(1, $this->inbox()->unreadCount($upper), 'UserA is untouched');
+        self::assertSame([], $this->store()->contextTypes($upper));
+    }
+
+    public function testStatisticsCountWithoutContent(): void
+    {
+        $this->boot();
+        $this->notifier()->notify(new NotificationRequest('billing.ready', [$this->r('a'), $this->r('b')], null, null, 'export:1', '/billing', dedupeKey: 'k1'));
+        $this->notifier()->notify(new NotificationRequest('invitation_accepted', [$this->r('a')], null, null, 'i:1', '/i'));
+        $this->inbox()->markAllRead($this->r('b'));
+        $now   = $this->clock()->now();
+        $stats = $this->store()->statistics($now->modify('-7 days'), $now, 10);
+        self::assertSame(3, $stats->rows);
+        self::assertSame(2, $stats->unread);
+        self::assertSame(1, $stats->dedupeMarkers);
+        self::assertSame(['billing.ready' => 2, 'invitation_accepted' => 1], $stats->writtenByType);
+        self::assertSame(['billing.ready' => 2], $this->store()->statistics($now->modify('-7 days'), $now, 1)->writtenByType);
+        self::assertSame([], $this->store()->statistics($now->modify('+1 day'), $now->modify('+2 days'), 10)->writtenByType);
+    }
+
+    public function testTheDoctrineResolverKeepsAManagedUserUntouched(): void
+    {
+        $kernel = $this->boot();
+        if ($this->host()->kind !== Host::STANDARD) {
+            self::assertNull($this->resolver()->userOf(new RecipientRef('user', 'x')), 'another recipient type');
+
+            return;
+        }
+        $user = $this->host()->createUser($kernel, 'u1');
+        self::assertInstanceOf(User::class, $user);
+        $user->name = 'changed, not flushed';
+        $again      = $this->resolver()->userOf($this->r('u1'));
+        self::assertSame($user, $again, 'the managed instance is returned');
+        self::assertSame('changed, not flushed', $user->name, 'never refreshed over the host\'s pending change (audit QL-L4)');
+        $this->host()->entityManager($kernel)->clear();
+        $loaded = $this->resolver()->userOf($this->r('u1'));
+        self::assertInstanceOf(User::class, $loaded);
+        self::assertFalse($this->host()->entityManager($kernel)->contains($loaded), 'a user it loaded is detached again');
+    }
+
     protected function r(string $id): RecipientRef
     {
         return $this->host()->recipient($id);
@@ -472,6 +680,36 @@ abstract class CoreFunctionalTestCase extends KernelTestCase
     protected function column(string $sql): array
     {
         return $this->connection()->fetchFirstColumn(sprintf($sql, $this->table()));
+    }
+
+    protected function publisher(): RecordingPublisher
+    {
+        return $this->service(RecordingPublisher::class, RecordingPublisher::class);
+    }
+
+    protected function resolver(): RecipientResolverInterface
+    {
+        return $this->service(RecipientResolverInterface::class, RecipientResolverInterface::class);
+    }
+
+    /** Id of the last row {@see self::insertRow()} wrote. */
+    protected string $lastInsertedId = '';
+
+    /** Rows {@see self::insertRow()} wrote in this test. */
+    private int $inserted = 0;
+
+    /**
+     * Writes a row behind the bundle's back (a row written before the recipient lost an access, or by an older version).
+     */
+    protected function insertRow(string $recipientId, string $type, ?ContextRef $context): void
+    {
+        $n                    = ++$this->inserted;
+        $this->lastInsertedId = sprintf('019a0000-0000-7000-8000-%012d', $n);
+        $this->connection()->insert($this->table(), [
+            'id'         => $this->lastInsertedId, 'recipient_type' => $this->host()->recipientType(), 'recipient_id' => $recipientId, 'type' => $type, 'category' => 'general',
+            'actor_type' => null, 'actor_id' => null, 'context_type' => $context?->type, 'context_id' => $context?->id, 'target' => 't:' . $n, 'url' => '/hidden/' . $n,
+            'params'     => '{}', 'repeats' => 1, 'first_created_at' => '2026-11-14 09:00:00', 'created_at' => '2026-11-14 09:00:00', 'read_at' => null,
+        ]);
     }
 
     protected function notifier(): NotifierInterface

@@ -1,0 +1,2 @@
+nowo_notify_kit:
+    resource: '@NowoNotifyKitBundle/Resources/config/routes.php'

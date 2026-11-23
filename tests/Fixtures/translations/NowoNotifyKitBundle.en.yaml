@@ -1,0 +1,4 @@
+notify:
+    category:
+        account: "Account"
+        issues: "Issues"
