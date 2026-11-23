@@ -12,6 +12,7 @@ an **immediate** REQ-SEC-004 audit before a tag that contains them; the rest is 
 - [Beacon answers](#beacon-answers)
 - [S1 notes (contract deviations)](#s1-notes-contract-deviations)
 - [S2 notes (contract deviations)](#s2-notes-contract-deviations)
+- [S3 notes (contract deviations)](#s3-notes-contract-deviations)
 
 ## Slices
 
@@ -20,7 +21,7 @@ an **immediate** REQ-SEC-004 audit before a tag that contains them; the rest is 
 | **S0** scaffold | `main`, no tag | Composer, Docker, Makefile + release-check, CI matrix (SQLite / MySQL / PostgreSQL job), PHPStan + worker rulesets, Igor, Rector, CS, coverage gate, Spec Kit baseline, docs set, `.github`, release / sync workflows, Flex recipe, demo skeleton (FrankenPHP worker, MySQL; Mercure joins in S2), strict config tree `enabled: false`. **Then the owner registers the package on Packagist** | Batched | Released (on `main`, packaged in v0.1.0) |
 | **S1** core inbox | 0.1.0 | Domain + XML / attribute mapping, DBAL stores, `notify()` with the in-app channel, coalescing, after-commit buffer, events, type registry (config + tagged), retention command + message, schema-check; plus write-time access (deny by default), the Doctrine recipient resolver, `forgetContext()`, dedupe keys and the load-readiness pattern (transaction-contract, real-database CI job) | Batched | Released (v0.1.0 2026-11-15; v0.1.1 and v0.2.0 are maintenance / concurrency releases) |
 | **S2** access + UI | 0.3.0 (next free tag) | `RecipientAccessCheckerInterface`, visibility, row operations, bell (Twig + script + CSS; Stimulus peer), inbox page, CSRF, realtime (Mercure + poll), operator page. Demo realtime: poll (Mercure covered by the kernel tests) | **Immediate** (before the tag) | In review (branch `feat/s2-access-ui`); needs the immediate REQ-SEC-004 audit before `0.3.0` |
-| **S3** preferences | 0.3.0 | Preference store + matrix, contexts, all / involved, master switch, preferences page, AuditKit bridge | Batched | Not started |
+| **S3** preferences | 0.4.0 (after S2's 0.3.0) | Preference store + matrix, contexts, all / involved, master switch, preferences page, AuditKit bridge; QL-I3, QL-I6, QL-I7 | Batched | In review (branch `feat/s3-preferences`, stacked on S2's PR #11); spec [`specs/004-s3-preferences`](../specs/004-s3-preferences/spec.md) |
 | **S4** channels | 0.4.0 | Async fan-out, delivery idempotency, mail (Mailer + MailKit), push (PwaBundle), Slack (SlackKit), quiet hours, digests, rate limits, scheduler recipe | Batched | Not started |
 | **S5** GDPR + bridges | 0.5.0 | UserKit eraser + export (+ actor unlinking), ChatKit bridge, ApiToken expiring bridge, InstanceSettings provider, translations ×7, docs | Batched | Not started |
 | **S6** public API + 1.0 | 0.6.0 → **1.0.0** | `<prefix>/notifications/v1` + OpenAPI (off by default), `bundle-req-audit` 100 %, SEC-004 batch audit on S0–S6 | **Immediate** for the API | Not started |
@@ -42,7 +43,7 @@ What is left:
   channels, GDPR and bridges, public API are not started. S2 and the S6 API need an **immediate** REQ-SEC-004 audit
   before their tags.
 - **Deferred audit items** (tables below): S2 closes QL-L4, QL-I1 (in-app), QL-I5 and QL-I8 (read side); QL-I3,
-  QL-I4, QL-I6, QL-I7 and QL-I8 (write side) remain for S3 / S4; QL-I2 is docs; QL-D-L1 (host-named savepoints, known issue of 0.1.x, still open), QL-D-I2, QL-D-I3, QL-D-I4 (QL-D-L2 closed in 0.2.0).
+  QL-I4 and QL-I8 (write side) remain for S4 (S3 closes QL-I3, QL-I6 and QL-I7); QL-I2 is docs; QL-D-L1 (host-named savepoints, known issue of 0.1.x, still open), QL-D-I2, QL-D-I3, QL-D-I4 (QL-D-L2 closed in 0.2.0).
 - **REQ gaps:** none open for what is built (checklist row at v0.2.0: 112 ok, 0 gaps; REQ-RUNTIME-003 closed by 0.2.0).
   REQs deferred to the unbuilt slices and the final `bundle-req-audit` at 100 % of the applicable REQs remain.
 - **REQ-SEC-004:** appendix QL (0.1.0 S1), SE and SI (batches, 0.1.1 / 0.1.2 checks) and TJ (0.2.0, release OK) cover
@@ -125,11 +126,11 @@ permission) and stays open for the write-time fan-out (S4); QL-I6 and QL-I7 move
 | QL-L4 | S2 ✅ | `DoctrineRecipientResolver::userOf()` uses `Query::HINT_REFRESH`, which overwrites a managed, dirty user: return the managed instance (`UnitOfWork::tryGetById()`) or query without refresh, then detach |
 | QL-I1 | S2 ✅ in-app / S4 mail | Titles with Twig autoescape only (no `\|raw`), bidi isolation (`<bdi>` / `dir=auto`), built-in placeholders (`%actor%`, `%target%`) applied after the params so a param cannot spoof them; strip CR/LF from values in mail subjects and headers; re-check `_redirect` with `isLocalPath()` after decoding |
 | QL-I2 | S5 (docs) | Dedupe keys are global: document a `<type>:<target>:<state>` convention or hash the type into the key |
-| QL-I3 | S3 | Cap `NotificationRequest::$involved` at `fan_out.max_recipients` |
+| QL-I3 | S3 ✅ | Cap `NotificationRequest::$involved` at `fan_out.max_recipients` |
 | QL-I4 | S4 | Retention: deadline check inside the per-recipient trim loop; keyset instead of `OFFSET keep` |
 | QL-I5 | S2 ✅ (docs, USAGE) | A host that commits in `kernel.terminate` after the main `finish_request`: its events run at `kernel.terminate` (drain), document the order |
-| QL-I6 | S3 (moved) | Application-level unit-of-work port instead of importing `Infrastructure\Persistence\NotifyKitTransactions` in Application / Domain |
-| QL-I7 | S3 (moved) | Tag the after-commit middleware for the bundle connection only |
+| QL-I6 | S3 ✅ | Application-level unit-of-work port (`Application\UnitOfWorkInterface`) instead of importing `Infrastructure\Persistence\NotifyKitTransactions` in Application / Domain |
+| QL-I7 | S3 ✅ | Tag the after-commit middleware for the bundle connection only (`AfterCommitMiddlewarePass`) |
 | QL-I8 | S2 ✅ read / S4 write | Batch `contextsGranting()` per permission instead of one call per recipient |
 
 ## Delta audit QL-D items (2026-11-15)
@@ -156,4 +157,18 @@ the others stay open and ride with the next slices.
 | §8.4 operator page "delivery failures, digest backlog, last retention run" | Counts of the inbox and the realtime mode; *Run retention now* is logged | Deliveries and digests arrive with S4; AuditKit with S3 |
 | §6.4 poll interval ≥ 30 s | `realtime.poll_seconds` defaults to 60 and accepts 10 to 3600 | The demo polls every 10 s; hosts keep the 60 s default unless they lower it |
 | §14 demo + Mercure | The demo polls every 10 s | Mercure is covered by the kernel tests (private update, hashed topic, subscriber cookie) |
+
+## S3 notes (contract deviations)
+
+| Contract | S3 | Why |
+| --- | --- | --- |
+| §4.2 `PreferencesInterface` (matrix, quiet hours, digest) | S3 ships `matrixFor()`, `save()` and `resetContext()`; `quietHours()` / `saveQuietHours()` / `digest()` / `saveDigest()` and `notify_channel_setting` come with S4 | Quiet hours and digests only matter for the out-of-band channels (S4) |
+| §4.2 `save(): void` | `save()` returns the changed cells (`list<PreferenceKey>`) and takes per-cell expectations (`PreferenceExpectation`) | REQ-RUNTIME-003: optimistic concurrency of the autosave (409 + `CONFLICT_001` when stale) |
+| §4.2 (no reset method) | `resetContext()` for *Reset to account settings* (§8.3) | The page needs it; a set of per-cell deletes would need every key |
+| §8.3 matrix columns | `in_app` plus the channels the registered types name; out-of-band channels are stored and readable now, delivered from S4 | Beacon can read the preferences for its member alerts before S4 (§12.2); no channel SPI yet |
+| §8.3 "searchable list" of contexts | A plain list of the provider's contexts (with their group) | A search field joins when a host has many contexts (Beacon: tens of projects) |
+| §8.3 Push / Slack device links, quiet hours, digest | Not on the page | S4 (channels) |
+| §6.4 `limits.ui_writes` | Still not enforced (S4, with the other rate limits) | As in S2: logged-in person, CSRF, own rows only |
+| §6.7 audit of the channel switch | Only preference changes and *Run retention now* are audited | There is no operator channel switch before S4 |
+| Bell script REQ-ASSETS-005 line | The new preferences script logs it (`logger.ts`, `build-info.json`); the bell joins with its next change | Keep the S2 bell (PR #11) untouched while it is in review |
 

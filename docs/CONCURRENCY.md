@@ -40,6 +40,8 @@ in [CONTRACT.md](CONTRACT.md#53-writes-transactions-and-events-rules-6-and-7); t
 | `InboxInterface::markRead()` / `markUnread()` (S2) | One unit | Plain lookup by id **and** recipient, visibility re-check, then a conditional `UPDATE … SET read_at = ? WHERE id IN (?) AND recipient … AND read_at IS NULL` (or `IS NOT NULL`): no read-modify-write, idempotent, never touches the repeat count; a concurrent repeat on the row waits on the row lock | `TransientStorageFailure`: `CONFLICT_001`, nothing written; the endpoints answer 409 + `Retry-After` themselves |
 | `InboxInterface::markAllRead()` (S2) | One unit per batch (keyset by id over the visible unread rows, `batch_size` ids) | The same conditional `UPDATE` by ids (rows locked in primary-key order); the event and the badge follow the last batch | `TransientStorageFailure` for that batch; earlier batches stay read and a retry finishes the rest (idempotent), so the endpoint answers `CONFLICT_001` |
 | Operator *Run retention now* (S2) | Retention's own units | As retention | 409 + `CONFLICT_001` (the host's error page) |
+| `PreferencesInterface::save()` (S3; the page's autosave and no-JS form) | One unit for the whole change set, cells in key order (one lock order for every writer) | **Optimistic, per cell**: each change carries the stored state the caller saw (`PreferenceExpectation`, the page's token `-` / `1a` / `0i`…) and is written with **one conditional statement** on the unique cell key: insert-if-absent (`ON DUPLICATE KEY UPDATE id = id` / `ON CONFLICT DO NOTHING`), `UPDATE … WHERE key AND enabled = ? AND scope = ?`, `DELETE … WHERE key AND enabled = ? AND scope = ?`; 0 rows = the cell moved on → `PreferenceConflictException` and the unit rolls back (all or nothing). Without an expectation: an upsert / delete (last write wins, never two rows) | Stale: **409** + `CONFLICT_001` + `error: stale` + the current cells (no `Retry-After`: read, then decide). Lock: `TransientStorageFailure` → 409 + `Retry-After` + `CONFLICT_001` |
+| `PreferencesInterface::resetContext()` (S3) | One unit | Plain read of the context's overrides, then `DELETE … WHERE id IN (…)` (the switch stays); idempotent | `TransientStorageFailure`: `CONFLICT_001`, nothing deleted; run it again |
 
 Reads (unread count, pages, the bell) take no lock and open no transaction.
 
@@ -106,6 +108,15 @@ timeout or serialization failure surfaces as `Nowo\TransactionContract\Transient
     `CONFLICT_001` with a `Retry-After` hint, leaves the connection at level 0 and writes nothing; the retry coalesces;
   - separate processes write the same recipient concurrently: no repeat is lost, none fails;
   - dedupe claims take no gap lock, and concurrent writers claim every key exactly once.
+- `tests/Integration/Database/PreferencesConcurrencyTest.php` (S3), same databases, two real connections:
+  - a save whose expectation another connection made stale is refused, writes nothing of its change set (all or
+    nothing) and leaves the connection at level 0;
+  - a save waiting on a cell another open transaction holds is `TransientStorageFailure` (`CONFLICT_001`, `Retry-After`
+    1 s, level 0), and the retry after the commit goes through;
+  - four processes toggle the same cell with read-then-conditional-write: never two rows, and the final state is the
+    initial one flipped exactly once per save that went through (no lost update).
+- `tests/Unit/Infrastructure/DbalPreferenceStoreTest.php` covers every conditional write (changed, unchanged,
+  conflict) on SQLite; `tests/Integration/Web/PreferencesWebTest.php` the 409 answers of the page and the JSON endpoint.
 - `tests/Unit/Infrastructure/ConflictMappingTest.php` covers the code of every failure shape (nothing committed:
   `CONFLICT_001`; committed or a lost savepoint: `CONFLICT_002`; unique violation and lost connection left alone) and the
   host mapper.
@@ -125,5 +136,10 @@ NOWO_TEST_DATABASE_URL='mysql://root@127.0.0.1:3306/app?serverVersion=8.4.0&char
 - **Two concurrent first notifications of one recipient and target** insert two rows (no gap lock by design); the next
   repeat coalesces into the newer one. The unread count stays exact.
 - **A retention run killed halfway** leaves its chunks deleted and the rest for the next run.
+- **Preferences, ABA**: a cell changed and changed back elsewhere between the page load and the save still matches
+  the page's token, so the save goes through. The result is what the person chose on a cell that holds what they saw.
+- **Preferences, a context cell's default** is the account choice read before the save: an override equal to it is not
+  stored. A concurrent change of the account cell can leave a context override that equals the new account value (a
+  harmless extra row).
 - **A lost acknowledgement** (commit succeeded, the connection dropped before the answer) cannot be told from a failure:
   use `dedupe_key` for producers that must not repeat.

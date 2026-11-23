@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+  - [S3: preferences](#s3-preferences)
   - [S2: inbox, bell and pages](#s2-inbox-bell-and-pages)
 - [To 0.2.0](#to-020)
   - [Lock conflicts answer 409 + CONFLICT codes](#lock-conflicts-answer-409--conflict-codes)
@@ -10,6 +11,34 @@
 - [To 0.1.0](#to-010)
 
 ## Unreleased
+
+### S3: preferences
+
+```bash
+composer update nowo-tech/notify-kit-bundle
+php bin/console nowo:notify-kit:schema-check    # shows the CREATE TABLE of <prefix>notify_preference
+php bin/console assets:install                  # js/nowo-notify-kit-preferences.js
+```
+
+- **Schema (additive)**: one new table, `<prefix>notify_preference` (reference DDL in
+  [INSTALLATION.md](INSTALLATION.md)). Create it with your migrations (`doctrine:migrations:diff` picks it up from the
+  bundle mapping) before you deploy. Until it exists, `notify()` of a type with `in_app_optional: true` and the
+  preferences page fail; nothing else reads it.
+- **`notify()`**: a type with `in_app_optional: true` now follows each person's preferences for its bell row (with no
+  stored preference the result is the same as before). Types with the default locked bell row are unchanged and read
+  nothing new.
+- **`NotificationRequest::$involved`** above `fan_out.max_recipients` (default 1,000) is now refused with
+  `InvalidNotificationArgumentException` (audit QL-I3).
+- **The page** (`web_ui.enabled`): `GET/POST {web_ui.preferences_path}` (default `/account/notifications`) plus
+  `…/cells`, `…/context`, `…/context/reset` come with the routes you already import. Add an `access_control` line for the
+  path; `web_ui.security.preferences_roles` (default: `access_roles`) and `preferences_access_checker` set who may open
+  it. Per-context switches need `preferences.contexts.provider`: only the contexts it lists for the person can be
+  tuned.
+- **AuditKit**: with nowo-tech/audit-kit-bundle's action log on, `bridges.audit_kit: auto` (default) starts recording
+  `notify.preferences_changed` and `notify.retention_run`. Set it to `false` to keep them out.
+- **Internal**: the application services take `Application\UnitOfWorkInterface` (audit QL-I6); the after-commit DBAL
+  middleware now wraps only the bundle connection (audit QL-I7). A host that constructed `Notifier`, `Inbox` or
+  `Retention` by hand keeps working (`NotifyKitTransactions` implements the port).
 
 ### S2: inbox, bell and pages
 

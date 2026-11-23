@@ -9,6 +9,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- **S3 preferences** (contract 221-B §4.1, §4.2, §5.1, §6.6, §6.7, §7.1, §8.3; spec `specs/004-s3-preferences`):
+  - **Storage** `<prefix>notify_preference` (deviations only; unique per recipient × context × category × channel;
+    binary NO PAD collations on MySQL / MariaDB; XML mapping `StoredPreference.orm.xml` and attribute twin
+    `PreferenceRecord`; schema check and reference DDL).
+  - **`PreferencesInterface`**: `matrixFor()`, `save()` (all or nothing, cells in key order, one conditional statement
+    per cell, optimistic concurrency with `PreferenceExpectation`; `PreferenceConflictException` when stale) and
+    `resetContext()`. Value objects `Scope`, `ChannelPreference`, `PreferenceKey`, `PreferenceRow`, `PreferenceMatrix`
+    (Beacon's merge order: locked channel → master switch → context switch → context override → account row →
+    type default; scope `all` / `involved`), `PreferenceChange`, `PreferenceChangeSet`, `PreferenceExpectation`; event
+    `PreferencesChangedEvent` (cell keys only, after the commit).
+  - **`notify()`** honours the preferences of a type whose bell row is optional (`in_app_optional`): master switch,
+    context switch, overrides, scope `involved` (one read for every recipient); `NotifyResult::$skippedPreference`.
+    `TypeRegistryInterface::channels()` lists `in_app` plus the channels the registered types name.
+  - **Preferences page** under `web_ui.preferences_path` (`/account/notifications`): UiKit settings scaffold, FormKit
+    matrix form (master switch, category × channel checkboxes, *Always on* for locked cells, scope per category, the
+    person's contexts with a switch and *Customise*), context page and dialog fragment, *Reset to account settings*,
+    JSON autosave `POST …/cells` (409 + `CONFLICT_001` with the current cells when stale, 409 + `Retry-After` on a lock,
+    422 when invalid). New script `js/nowo-notify-kit-preferences.js` (autosave, context dialog loaded on demand,
+    REQ-ASSETS-005 "script loaded" line with the quiet switch, `build-info.json`).
+  - **REQ-UI-002**: `PreferencesAccessCheckerInterface`, `web_ui.security.preferences_roles` (null = `access_roles`) and
+    `web_ui.security.preferences_access_checker`. Contexts are accepted only from `ContextProviderInterface::contextsFor()`
+    of the logged-in person (404 otherwise).
+  - **AuditKit bridge** (`bridges.audit_kit`): `notify.preferences_changed` and `notify.retention_run` in AuditKit's
+    action log (ids, cell keys and counts only).
+  - Translations of the page in 7 locales; `docs/USAGE.md` (preferences, audit trail, browser console),
+    `docs/CONFIGURATION.md`, `docs/CONCURRENCY.md`, `docs/TEMPLATES.md`, `docs/UPGRADING.md`.
+
 - **S2 access + UI** (contract 221-B §4.2, §6, §7.1, §8.1, §8.2, §8.4):
   - **Read-time visibility** (`Application\Visibility\VisibilityResolver`): personal rows always; a row with a
     context only while the access checker still grants the type's permission there (unknown types:
@@ -71,6 +98,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `NotificationStoreInterface` (internal) gains the read side; `countUnread()` takes an optional visibility.
 - The route loader `nowo_notify_kit` is registered even while the bundle is disabled (it then adds no route), so the
   routes import never fails.
+- Application services depend on the new `Application\UnitOfWorkInterface` port instead of the infrastructure
+  transaction class (audit QL-I6).
+- The after-commit DBAL middleware wraps only the bundle connection (the connection of `doctrine.entity_manager`; audit
+  QL-I7).
+- `NotificationRequest::$involved` larger than `fan_out.max_recipients` is refused (audit QL-I3).
 
 ## [0.2.0] - 2026-11-18
 

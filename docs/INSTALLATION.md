@@ -92,8 +92,10 @@ php bin/console nowo:notify-kit:schema-check   # exit 0 = the tables match the m
 | --- | --- |
 | `nowo_notify_notification` | The inbox: one row per recipient (coalesced repeats), UUIDv7 ids |
 | `nowo_notify_dedupe` | Dedupe keys of `NotificationRequest::$dedupeKey` (sha256 of the key, 24 hours) |
+| `nowo_notify_preference` | Preferences (S3): one row per deviation from the defaults, unique per recipient × context (`''` = account) × category (`*` = switch) × channel (`*` = every channel) |
 
-Identifier columns (ids, recipient / actor / context references, type, category, target, dedupe hash) use a binary
+Identifier columns (ids, recipient / actor / context references, type, category, target, dedupe hash, preference
+context key, channel and scope) use a binary
 **NO PAD** collation on MySQL / MariaDB: `utf8mb4_0900_bin` on MySQL 8, `utf8mb4_nopad_bin` on MariaDB. So ids compare
 exactly: `usera` is not `UserA`, and `42` is not `42 `. On MySQL 5.7 the fallback is `utf8mb4_bin`, which pads
 trailing spaces; the value objects refuse ids with edge white space and every query also compares the bytes, so
@@ -113,6 +115,7 @@ MySQL 8.0.17+ / 8.4:
 ```sql
 CREATE TABLE nowo_notify_notification (recipient_type VARCHAR(32) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, recipient_id VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, type VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, category VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, actor_type VARCHAR(32) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`, actor_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`, context_type VARCHAR(32) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`, context_id VARCHAR(64) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`, target VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, url VARCHAR(500) NOT NULL, params JSON NOT NULL, repeats INT NOT NULL, first_created_at DATETIME NOT NULL, created_at DATETIME NOT NULL, read_at DATETIME DEFAULT NULL, id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, INDEX idx_nowo_notify_notification_inbox (recipient_type, recipient_id, read_at, created_at, id), INDEX idx_nowo_notify_notification_repeat (recipient_type, recipient_id, type, target), INDEX idx_nowo_notify_notification_context (context_type, context_id), INDEX idx_nowo_notify_notification_created (created_at), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4;
 CREATE TABLE nowo_notify_dedupe (expires_at DATETIME NOT NULL, key_hash VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, INDEX idx_nowo_notify_dedupe_expires (expires_at), PRIMARY KEY (key_hash)) DEFAULT CHARACTER SET utf8mb4;
+CREATE TABLE nowo_notify_preference (recipient_type VARCHAR(32) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, recipient_id VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, context_key VARCHAR(100) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, category VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, channel VARCHAR(32) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, enabled TINYINT NOT NULL, scope VARCHAR(16) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`, updated_at DATETIME NOT NULL, id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, UNIQUE INDEX uniq_nowo_notify_preference_cell (recipient_type, recipient_id, context_key, category, channel), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4;
 ```
 
 MariaDB 10.6+ (`utf8mb4_nopad_bin`; checked in CI on MariaDB 11.4 since 0.2.0):
@@ -121,6 +124,7 @@ MariaDB 10.6+ (`utf8mb4_nopad_bin`; checked in CI on MariaDB 11.4 since 0.2.0):
 ```sql
 CREATE TABLE nowo_notify_notification (recipient_type VARCHAR(32) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, recipient_id VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, type VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, category VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, actor_type VARCHAR(32) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_nopad_bin`, actor_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_nopad_bin`, context_type VARCHAR(32) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_nopad_bin`, context_id VARCHAR(64) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_nopad_bin`, target VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, url VARCHAR(500) NOT NULL, params JSON NOT NULL, repeats INT NOT NULL, first_created_at DATETIME NOT NULL, created_at DATETIME NOT NULL, read_at DATETIME DEFAULT NULL, id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, INDEX idx_nowo_notify_notification_inbox (recipient_type, recipient_id, read_at, created_at, id), INDEX idx_nowo_notify_notification_repeat (recipient_type, recipient_id, type, target), INDEX idx_nowo_notify_notification_context (context_type, context_id), INDEX idx_nowo_notify_notification_created (created_at), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4;
 CREATE TABLE nowo_notify_dedupe (expires_at DATETIME NOT NULL, key_hash VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, INDEX idx_nowo_notify_dedupe_expires (expires_at), PRIMARY KEY (key_hash)) DEFAULT CHARACTER SET utf8mb4;
+CREATE TABLE nowo_notify_preference (recipient_type VARCHAR(32) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, recipient_id VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, context_key VARCHAR(100) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, category VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, channel VARCHAR(32) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, enabled TINYINT NOT NULL, scope VARCHAR(16) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_nopad_bin`, updated_at DATETIME NOT NULL, id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, UNIQUE INDEX uniq_nowo_notify_preference_cell (recipient_type, recipient_id, context_key, category, channel), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4;
 ```
 
 PostgreSQL 16 / 17:
@@ -134,6 +138,8 @@ CREATE INDEX idx_nowo_notify_notification_context ON nowo_notify_notification (c
 CREATE INDEX idx_nowo_notify_notification_created ON nowo_notify_notification (created_at);
 CREATE TABLE nowo_notify_dedupe (expires_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, key_hash VARCHAR(64) NOT NULL, PRIMARY KEY (key_hash));
 CREATE INDEX idx_nowo_notify_dedupe_expires ON nowo_notify_dedupe (expires_at);
+CREATE TABLE nowo_notify_preference (recipient_type VARCHAR(32) NOT NULL, recipient_id VARCHAR(128) NOT NULL, context_key VARCHAR(100) NOT NULL, category VARCHAR(64) NOT NULL, channel VARCHAR(32) NOT NULL, enabled BOOLEAN NOT NULL, scope VARCHAR(16) DEFAULT NULL, updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, id VARCHAR(36) NOT NULL, PRIMARY KEY (id));
+CREATE UNIQUE INDEX uniq_nowo_notify_preference_cell ON nowo_notify_preference (recipient_type, recipient_id, context_key, category, channel);
 ```
 
 SQLite:
@@ -147,6 +153,8 @@ CREATE INDEX idx_nowo_notify_notification_context ON nowo_notify_notification (c
 CREATE INDEX idx_nowo_notify_notification_created ON nowo_notify_notification (created_at);
 CREATE TABLE nowo_notify_dedupe (expires_at DATETIME NOT NULL, key_hash VARCHAR(64) NOT NULL, PRIMARY KEY (key_hash));
 CREATE INDEX idx_nowo_notify_dedupe_expires ON nowo_notify_dedupe (expires_at);
+CREATE TABLE nowo_notify_preference (recipient_type VARCHAR(32) NOT NULL, recipient_id VARCHAR(128) NOT NULL, context_key VARCHAR(100) NOT NULL, category VARCHAR(64) NOT NULL, channel VARCHAR(32) NOT NULL, enabled BOOLEAN NOT NULL, scope VARCHAR(16) DEFAULT NULL, updated_at DATETIME NOT NULL, id VARCHAR(36) NOT NULL, PRIMARY KEY (id));
+CREATE UNIQUE INDEX uniq_nowo_notify_preference_cell ON nowo_notify_preference (recipient_type, recipient_id, context_key, category, channel);
 ```
 
 ## Next steps
