@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 /**
  * REQ-DEMO-013 — NotifyKitBundle demo happy path: the home page renders on the UiKit shell and reports the bundle
