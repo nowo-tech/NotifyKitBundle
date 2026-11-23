@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\NotifyKitBundle\Infrastructure\Persistence;
 
 use Closure;
+use IgorPhp\IgorBundle\Attribute\WorkerSafe;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Contracts\Service\ResetInterface;
@@ -38,6 +39,8 @@ final class AfterCommitQueue implements ResetInterface
     private WeakMap $held;
 
     /** @var list<Closure(): void> */
+    // @igor-ignore - reset() runs and empties this list through drain() (ready work is executed, never dropped), which Igor cannot see.
+    #[WorkerSafe]
     private array $ready = [];
 
     /**
