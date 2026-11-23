@@ -7,22 +7,49 @@ an **immediate** REQ-SEC-004 audit before a tag that contains them; the rest is 
 ## Table of contents
 
 - [Slices](#slices)
+- [Road to 1.0.0](#road-to-100)
 - [Owner decisions (2026-11-12)](#owner-decisions-2026-11-12)
 - [Beacon answers](#beacon-answers)
 - [S1 notes (contract deviations)](#s1-notes-contract-deviations)
 
 ## Slices
 
-| Slice | Version | Content | Audit |
-| --- | --- | --- | --- |
-| **S0** scaffold | `main`, no tag | Composer, Docker, Makefile + release-check, CI matrix (SQLite / MySQL / PostgreSQL job), PHPStan + worker rulesets, Igor, Rector, CS, coverage gate, Spec Kit baseline, docs set, `.github`, release / sync workflows, Flex recipe, demo skeleton (FrankenPHP worker, MySQL; Mercure joins in S2), strict config tree `enabled: false`. **Then the owner registers the package on Packagist** | Batched |
-| **S1** core inbox ✅ (0.1.0, 2026-11-15) | 0.1.0 | Domain + XML / attribute mapping, DBAL stores, `notify()` with the in-app channel, coalescing, after-commit buffer, events, type registry (config + tagged), retention command + message, schema-check; plus write-time access (deny by default), the Doctrine recipient resolver, `forgetContext()`, dedupe keys and the load-readiness pattern (transaction-contract, real-database CI job) | Batched |
-| **S2** access + UI | 0.2.0 | `RecipientAccessCheckerInterface`, visibility, row operations, bell (Twig + Stimulus + CSS), inbox page, CSRF, realtime (Mercure + poll), operator page | **Immediate** |
-| **S3** preferences | 0.3.0 | Preference store + matrix, contexts, all / involved, master switch, preferences page, AuditKit bridge | Batched |
-| **S4** channels | 0.4.0 | Async fan-out, delivery idempotency, mail (Mailer + MailKit), push (PwaBundle), Slack (SlackKit), quiet hours, digests, rate limits, scheduler recipe | Batched |
-| **S5** GDPR + bridges | 0.5.0 | UserKit eraser + export (+ actor unlinking), ChatKit bridge, ApiToken expiring bridge, InstanceSettings provider, translations ×7, docs | Batched |
-| **S6** public API + 1.0 | 0.6.0 → **1.0.0** | `<prefix>/notifications/v1` + OpenAPI (off by default), `bundle-req-audit` 100 %, SEC-004 batch audit on S0–S6 | **Immediate** for the API |
-| Beacon | after 1.0.0 | Contract §12 phase 1, then phase 2 (Slack DM) | Beacon's own |
+| Slice | Version | Content | Audit | Status (2026-11-23) |
+| --- | --- | --- | --- | --- |
+| **S0** scaffold | `main`, no tag | Composer, Docker, Makefile + release-check, CI matrix (SQLite / MySQL / PostgreSQL job), PHPStan + worker rulesets, Igor, Rector, CS, coverage gate, Spec Kit baseline, docs set, `.github`, release / sync workflows, Flex recipe, demo skeleton (FrankenPHP worker, MySQL; Mercure joins in S2), strict config tree `enabled: false`. **Then the owner registers the package on Packagist** | Batched | Released (on `main`, packaged in v0.1.0) |
+| **S1** core inbox | 0.1.0 | Domain + XML / attribute mapping, DBAL stores, `notify()` with the in-app channel, coalescing, after-commit buffer, events, type registry (config + tagged), retention command + message, schema-check; plus write-time access (deny by default), the Doctrine recipient resolver, `forgetContext()`, dedupe keys and the load-readiness pattern (transaction-contract, real-database CI job) | Batched | Released (v0.1.0 2026-11-15; v0.1.1 and v0.2.0 are maintenance / concurrency releases) |
+| **S2** access + UI | 0.2.0 | `RecipientAccessCheckerInterface`, visibility, row operations, bell (Twig + Stimulus + CSS), inbox page, CSRF, realtime (Mercure + poll), operator page | **Immediate** | Not started |
+| **S3** preferences | 0.3.0 | Preference store + matrix, contexts, all / involved, master switch, preferences page, AuditKit bridge | Batched | Not started |
+| **S4** channels | 0.4.0 | Async fan-out, delivery idempotency, mail (Mailer + MailKit), push (PwaBundle), Slack (SlackKit), quiet hours, digests, rate limits, scheduler recipe | Batched | Not started |
+| **S5** GDPR + bridges | 0.5.0 | UserKit eraser + export (+ actor unlinking), ChatKit bridge, ApiToken expiring bridge, InstanceSettings provider, translations ×7, docs | Batched | Not started |
+| **S6** public API + 1.0 | 0.6.0 → **1.0.0** | `<prefix>/notifications/v1` + OpenAPI (off by default), `bundle-req-audit` 100 %, SEC-004 batch audit on S0–S6 | **Immediate** for the API | Not started |
+| Beacon | after 1.0.0 | Contract §12 phase 1, then phase 2 (Slack DM) | Beacon's own | Waiting for 1.0.0 |
+
+## Road to 1.0.0
+
+State on 2026-11-23: tags `v0.1.0` (S1 core inbox), `v0.1.1` (prune handler by attribute) and `v0.2.0` (2026-11-18,
+**concurrency release, not slice S2**: 409 + `CONFLICT_001` / `CONFLICT_002`, MariaDB leg, `docs/CONCURRENCY.md`, closes
+QL-D-L2). `main` has two unreleased, non-runtime changes (transaction-doctrine `^1.8.1`, demo in UiKit's platform
+shell). No open pull request.
+
+Because `0.2.0` was used by the concurrency release, the slice-to-version column is a plan: S2 to S6 take the next free
+`0.x` tag (`0.3.0` and up), one per slice after its audit, and S6 ends in `1.0.0`.
+
+What is left:
+
+- **Slices S2 to S6** (none started): access and UI (bell, inbox page, realtime, operator page), preferences, channels,
+  GDPR and bridges, public API. S2 and the S6 API need an **immediate** REQ-SEC-004 audit before their tags.
+- **Deferred audit items** (tables above): QL-L4, QL-I1, QL-I3, QL-I4, QL-I6 to QL-I8 for S2 to S4; QL-I2 and QL-I5 are
+  docs; QL-D-L1 (host-named savepoints, known issue of 0.1.x, still open), QL-D-I2, QL-D-I3, QL-D-I4 (QL-D-L2 closed in 0.2.0).
+- **REQ gaps:** none open for what is built (checklist row at v0.2.0: 112 ok, 0 gaps; REQ-RUNTIME-003 closed by 0.2.0).
+  REQs deferred to the unbuilt slices and the final `bundle-req-audit` at 100 % of the applicable REQs remain.
+- **REQ-SEC-004:** appendix QL (0.1.0 S1), SE and SI (batches, 0.1.1 / 0.1.2 checks) and TJ (0.2.0, release OK) cover
+  everything released. Nothing covers S2 to S6 yet.
+- **Owner decisions:** none open. Q-O1 to Q-O12 answered 2026-11-12, S1 deviations accepted 2026-11-15, Beacon Q-B1 to
+  Q-B6 answered as recommended. The API in S6 needs ApiTokenBundle (module `notifications`), which is itself before 1.0.0.
+- **Final gate:** `bundle-req-audit` at 100 %, then the REQ-SEC-004 batch audit over S0 to S6, then `1.0.0`.
+
+Distance to 1.0.0: large (five of seven slices not started).
 
 ## Owner decisions (2026-11-12)
 
@@ -99,7 +126,10 @@ sets `doctrine.transaction_runner` to a retrying adapter.
 | QL-I7 | S2 | Tag the after-commit middleware for the bundle connection only |
 | QL-I8 | S2 / S4 | Batch `contextsGranting()` per permission instead of one call per recipient |
 
-## Planned for 0.2.0 (delta audit QL-D, 2026-11-15)
+## Delta audit QL-D items (2026-11-15)
+
+These were planned for 0.2.0, but 0.2.0 shipped as the concurrency release. Only QL-D-L2 (MariaDB job) was delivered there;
+the others stay open and ride with the next slices.
 
 | ID | Item |
 | --- | --- |
