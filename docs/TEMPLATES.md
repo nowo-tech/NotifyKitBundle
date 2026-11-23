@@ -44,7 +44,8 @@ autoescape (never `|raw`) inside `<bdi dir="auto">`; params cannot spoof `%actor
 - A host template that extends `@!NowoNotifyKitBundle/<page>.html.twig` and overrides one of the data blocks above,
   saved as `templates/bundles/NowoNotifyKitBundle/<page>.html.twig`; or `web_ui.templates.inbox` / `.menu` / `.bell`.
 - Keep the `data-*` attributes of the bell and the menu (`data-nowo-notify-kit-*`, `data-id`, `data-unread`,
-  `data-action`): the script reads them.
+  `data-action`): the script reads them. The menu fragment must have **one** element with `data-nowo-notify-kit-menu`
+  that holds everything: the script inserts only that element and shows the error message when it is missing.
 - Restyle through `nowo_ui_kit.theme` (slots) and the UiKit tokens (`--nowo-ui-*`), never in the templates.
 
 ## Assets
