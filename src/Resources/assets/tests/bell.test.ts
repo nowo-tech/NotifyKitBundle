@@ -278,7 +278,7 @@ describe('NotifyKitBell', () => {
     class FakeSource {
       onmessage: ((event: MessageEvent<string>) => void) | null = null;
       close = vi.fn();
-      constructor(public url: string, public init?: EventSourceInit) {
+      constructor(public url: string, public init: EventSourceInit | undefined = undefined) {
         sources.push(this);
       }
     }
