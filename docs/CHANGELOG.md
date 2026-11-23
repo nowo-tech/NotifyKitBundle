@@ -8,12 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[0.4.0] - 2026-11-23](#040---2026-11-23)
 - [[0.3.0] - 2026-11-23](#030---2026-11-23)
 - [[0.2.0] - 2026-11-18](#020---2026-11-18)
 - [[0.1.1] - 2026-11-17](#011---2026-11-17)
 - [[0.1.0] - 2026-11-15](#010---2026-11-15)
 
 ## [Unreleased]
+
+## [0.4.0] - 2026-11-23
 
 ### Added
 
@@ -65,6 +68,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The after-commit DBAL middleware wraps only the bundle connection (the connection of `doctrine.entity_manager`; audit
   QL-I7).
 - `NotificationRequest::$involved` larger than `fan_out.max_recipients` is refused (audit QL-I3).
+
+[0.4.0]: https://github.com/nowo-tech/NotifyKitBundle/releases/tag/v0.4.0
 
 ## [0.3.0] - 2026-11-23
 
@@ -230,5 +235,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   every MySQL dedupe claim look successful, so a duplicate notice can get through (fails open: no leak). Leave it off on
   that connection.
 
-[Unreleased]: https://github.com/nowo-tech/NotifyKitBundle/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/nowo-tech/NotifyKitBundle/compare/v0.4.0...HEAD
 [0.1.0]: https://github.com/nowo-tech/NotifyKitBundle/releases/tag/v0.1.0

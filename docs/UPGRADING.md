@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.4.0](#to-040)
   - [S3: preferences](#s3-preferences)
 - [To 0.3.0](#to-030)
   - [S2: inbox, bell and pages](#s2-inbox-bell-and-pages)
@@ -12,6 +13,14 @@
 - [To 0.1.0](#to-010)
 
 ## Unreleased
+
+## To 0.4.0
+
+From **0.3.0**:
+
+```bash
+composer update nowo-tech/notify-kit-bundle
+```
 
 ### S3: preferences
 
