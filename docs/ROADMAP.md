@@ -154,5 +154,6 @@ the others stay open and ride with the next slices.
 | §6.6 `NotificationReadEvent` | Also dispatched for *mark unread* (`read: false`) | One event for every read-state change |
 | §4.3 `NotificationPresenterInterface` | Not shipped; in-app titles come from the type's translation key | Rich presentations are for the out-of-band channels (S4) |
 | §8.4 operator page "delivery failures, digest backlog, last retention run" | Counts of the inbox and the realtime mode; *Run retention now* is logged | Deliveries and digests arrive with S4; AuditKit with S3 |
+| §6.4 poll interval ≥ 30 s | `realtime.poll_seconds` defaults to 60 and accepts 10 to 3600 | The demo polls every 10 s; hosts keep the 60 s default unless they lower it |
 | §14 demo + Mercure | The demo polls every 10 s | Mercure is covered by the kernel tests (private update, hashed topic, subscriber cookie) |
 

@@ -18,12 +18,17 @@ composer update nowo-tech/notify-kit-bundle --with-all-dependencies
 php bin/console assets:install
 ```
 
-- **New dependencies**: `nowo-tech/ui-kit-bundle` ^2.68, `nowo-tech/form-kit-bundle` ^2.24 and the Symfony form,
-  security-core / security-csrf, routing, translation and Twig packages. Register `NowoUiKitBundle`,
+- **New dependencies**: `nowo-tech/ui-kit-bundle` ^2.68, `nowo-tech/form-kit-bundle` ^2.24, the Symfony asset, form,
+  framework-bundle, http-foundation, routing, security-core / security-csrf, translation and Twig packages, and
+  `twig/extra-bundle` + `twig/string-extra`. Register `NowoUiKitBundle`,
   `NowoFormKitBundle` and `TwigExtraBundle` if Flex did not.
 - **No schema change.** The read side uses the existing indexes.
 - **Nothing changes until you turn it on.** `web_ui.enabled` and `admin_ui.enabled` stay `false`; `realtime.mode: auto`
   only publishes when a Mercure hub service exists (otherwise it is `poll`, and nothing is published).
+- **Hosts that already run a Mercure hub**: with the default `realtime.mode: auto`, `notify()` and the row operations
+  now publish a private update (the unread count only) on `notify-kit/r/<hmac>` after each commit, even while
+  `web_ui.enabled` is `false`. Set `realtime.mode: off` to keep the 0.2 behaviour. The topic is derived from
+  `kernel.secret`: rotating the secret changes every topic (open tabs pick up the new one on the next page load).
 - To use the pages: import `@NowoNotifyKitBundle/Resources/config/routes.php`, set `recipient.class` or
   `recipient.resolver` (the container refuses `web_ui` without one), keep SecurityBundle and add `access_control` for
   `web_ui.path_prefix` (`ROLE_USER`) and `admin_ui.path_prefix` (`ROLE_ADMIN`); render `{{ notify_kit_bell() }}` in
