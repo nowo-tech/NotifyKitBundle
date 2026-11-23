@@ -9,12 +9,11 @@ use Nowo\NotifyKitBundle\Contract\ContextRef;
 use Nowo\NotifyKitBundle\Contract\InboxFilter;
 use Nowo\NotifyKitBundle\Contract\NotificationId;
 use Nowo\NotifyKitBundle\Contract\RecipientRef;
-use Nowo\NotifyKitBundle\Infrastructure\Persistence\NotifyKitTransactions;
 
 /**
- * Storage port of the inbox rows and dedupe keys. Writes run inside the caller's transaction (the bundle's
- * {@see NotifyKitTransactions}); every read by recipient re-checks
- * the recipient with `===` in PHP (audit LQ).
+ * Storage port of the inbox rows and dedupe keys. Writes run inside the caller's transaction (the bundle's unit of
+ * work, `Application\UnitOfWorkInterface`); every read by recipient re-checks the
+ * recipient with `===` in PHP (audit LQ).
  *
  * @internal
  */

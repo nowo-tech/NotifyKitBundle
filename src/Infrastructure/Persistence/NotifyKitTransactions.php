@@ -10,6 +10,7 @@ use Doctrine\DBAL\Exception as DbalException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use LogicException;
+use Nowo\NotifyKitBundle\Application\UnitOfWorkInterface;
 use Nowo\TransactionContract\TransactionRunnerInterface;
 use Nowo\TransactionContract\TransientStorageFailure;
 use Nowo\TransactionDoctrine\DoctrineTransactionRunner;
@@ -33,7 +34,7 @@ use function sprintf;
  *
  * Stateless (worker mode): the connection is resolved per call, so a connection the registry replaced is picked up.
  */
-final readonly class NotifyKitTransactions
+final readonly class NotifyKitTransactions implements UnitOfWorkInterface
 {
     /**
      * @param string $entityManager `doctrine.entity_manager` (falls back to a DBAL connection of that name)

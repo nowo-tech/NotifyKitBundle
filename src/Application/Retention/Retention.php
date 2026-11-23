@@ -6,9 +6,9 @@ namespace Nowo\NotifyKitBundle\Application\Retention;
 
 use DateTimeImmutable;
 use DateTimeZone;
+use Nowo\NotifyKitBundle\Application\UnitOfWorkInterface;
 use Nowo\NotifyKitBundle\Contract\Message\PruneNotificationsMessage;
 use Nowo\NotifyKitBundle\Domain\NotificationStoreInterface;
-use Nowo\NotifyKitBundle\Infrastructure\Persistence\NotifyKitTransactions;
 use Psr\Clock\ClockInterface;
 
 use function count;
@@ -31,7 +31,7 @@ final readonly class Retention
      */
     public function __construct(
         private NotificationStoreInterface $store,
-        private NotifyKitTransactions $transactions,
+        private UnitOfWorkInterface $transactions,
         private int $readDays = 90,
         private int $keepPerRecipient = 500,
         private int $batchSize = 500,

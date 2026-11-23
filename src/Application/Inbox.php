@@ -20,7 +20,6 @@ use Nowo\NotifyKitBundle\Domain\BatchResult;
 use Nowo\NotifyKitBundle\Domain\InboxCursor;
 use Nowo\NotifyKitBundle\Domain\Notification;
 use Nowo\NotifyKitBundle\Domain\NotificationStoreInterface;
-use Nowo\NotifyKitBundle\Infrastructure\Persistence\NotifyKitTransactions;
 use Psr\Clock\ClockInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 
@@ -52,7 +51,7 @@ final readonly class Inbox implements InboxInterface
      */
     public function __construct(
         private NotificationStoreInterface $store,
-        private NotifyKitTransactions $transactions,
+        private UnitOfWorkInterface $transactions,
         private VisibilityResolver $visibility,
         private UnreadBadge $badge,
         private ?EventDispatcherInterface $dispatcher = null,
