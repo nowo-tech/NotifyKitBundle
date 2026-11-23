@@ -15,6 +15,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **S3 preferences** (contract 221-B §4.1, §4.2, §5.1, §6.6, §6.7, §7.1, §8.3; spec `specs/004-s3-preferences`):
+  - **Storage** `<prefix>notify_preference` (deviations only; unique per recipient × context × category × channel;
+    binary NO PAD collations on MySQL / MariaDB; XML mapping `StoredPreference.orm.xml` and attribute twin
+    `PreferenceRecord`; schema check and reference DDL).
+  - **`PreferencesInterface`**: `matrixFor()`, `save()` (all or nothing, cells in key order, one conditional statement
+    per cell, optimistic concurrency with `PreferenceExpectation`; `PreferenceConflictException` when stale) and
+    `resetContext()`. Value objects `Scope`, `ChannelPreference`, `PreferenceKey`, `PreferenceRow`, `PreferenceMatrix`
+    (Beacon's merge order: locked channel → master switch → context switch → context override → account row →
+    type default; scope `all` / `involved`), `PreferenceChange`, `PreferenceChangeSet`, `PreferenceExpectation`; event
+    `PreferencesChangedEvent` (cell keys only, after the commit).
+  - **`notify()`** honours the preferences of a type whose bell row is optional (`in_app_optional`): master switch,
+    context switch, overrides, scope `involved` (one read for every recipient); `NotifyResult::$skippedPreference`.
+    `TypeRegistryInterface::channels()` lists `in_app` plus the channels the registered types name.
+  - **Preferences page** under `web_ui.preferences_path` (`/account/notifications`): UiKit settings scaffold, FormKit
+    matrix form (master switch, category × channel checkboxes, *Always on* for locked cells, scope per category, the
+    person's contexts with a switch and *Customise*), context page and dialog fragment, *Reset to account settings*,
+    JSON autosave `POST …/cells` (409 + `CONFLICT_001` with the current cells when stale, 409 + `Retry-After` on a lock,
+    422 when invalid). New script `js/nowo-notify-kit-preferences.js` (autosave, context dialog loaded on demand,
+    REQ-ASSETS-005 "script loaded" line with the quiet switch, `build-info.json`).
+  - **REQ-UI-002**: `PreferencesAccessCheckerInterface`, `web_ui.security.preferences_roles` (null = `access_roles`) and
+    `web_ui.security.preferences_access_checker`. Contexts are accepted only from `ContextProviderInterface::contextsFor()`
+    of the logged-in person (404 otherwise).
+  - **AuditKit bridge** (`bridges.audit_kit`): `notify.preferences_changed` and `notify.retention_run` in AuditKit's
+    action log (ids, cell keys and counts only).
+  - Translations of the page in 7 locales; `docs/USAGE.md` (preferences, audit trail, browser console),
+    `docs/CONFIGURATION.md`, `docs/CONCURRENCY.md`, `docs/TEMPLATES.md`, `docs/UPGRADING.md`.
+
+### Fixed
+
+- The AuditKit bridge is wired only when AuditKit flushes in `isolated` mode: in `host` mode `recordIdsAndFlush()` would
+  flush the host's entity manager with unrelated pending changes (REQ-ARCH-001 rule 6). `auto` skips it with a container
+  log line, `true` refuses to build; `nowo-tech/audit-kit-bundle` < 2.0 is a conflict (ZAL-1).
+- An optional bell of a type that does not name `in_app` in its defaults stays on, as in 0.3 (ZAL-2).
+- A type shown in the matrix takes its category's default when nothing is stored, so what the page shows is what is
+  delivered in categories whose types disagree (ZAL-3).
+- The no-JS form answers 404 when a context switch names a context the provider no longer lists, instead of writing the
+  account master switch (ZAL-4).
+- Insert-if-absent of a preference reads its new id back instead of trusting the affected-row count (MySQL
+  `CLIENT_FOUND_ROWS`, ZAL-I1); a failing audit write after *Run retention now* is logged, not answered 500 (ZAL-I2).
+- The bell script logs its REQ-ASSETS-005 "script loaded" line (ZAL-I3).
+
+### Changed
+
+- Application services depend on the new `Application\UnitOfWorkInterface` port instead of the infrastructure
+  transaction class (audit QL-I6).
+- The after-commit DBAL middleware wraps only the bundle connection (the connection of `doctrine.entity_manager`; audit
+  QL-I7).
+- `NotificationRequest::$involved` larger than `fan_out.max_recipients` is refused (audit QL-I3).
+
 ## [0.3.0] - 2026-11-23
 
 ### Added

@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Nowo\NotifyKitBundle;
 
+use Nowo\NotifyKitBundle\DependencyInjection\Compiler\AfterCommitMiddlewarePass;
+use Nowo\NotifyKitBundle\DependencyInjection\Compiler\AuditKitBridgePass;
 use Nowo\NotifyKitBundle\DependencyInjection\Compiler\RealtimePass;
 use Nowo\NotifyKitBundle\DependencyInjection\Compiler\RequireDoctrinePass;
 use Nowo\NotifyKitBundle\DependencyInjection\Compiler\TwigPathsPass;
 use Nowo\NotifyKitBundle\DependencyInjection\Compiler\WebUiPass;
 use Nowo\NotifyKitBundle\DependencyInjection\NowoNotifyKitExtension;
+use Symfony\Component\DependencyInjection\Compiler\PassConfig;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
 use Symfony\Component\HttpKernel\Bundle\Bundle;
@@ -18,7 +21,9 @@ use Symfony\Component\HttpKernel\Bundle\Bundle;
  *
  * S1 core: `NotifierInterface::notify()` writes the in-app rows (coalescing, deny by default, after-commit events),
  * the type registry, retention and the schema check. S2: read-time visibility, the inbox read and row operations,
- * the header bell, the inbox and operator pages and the realtime badge (see docs/ROADMAP.md for the later slices).
+ * the header bell, the inbox and operator pages and the realtime badge. S3: per-person preferences (category × channel
+ * matrix, master and context switches, scope all / involved), the preferences page and the AuditKit bridge (see
+ * docs/ROADMAP.md for the later slices).
  * Nothing but the (empty) route loader is registered while `nowo_notify_kit.enabled` is false.
  *
  * @author Héctor Franco Aceituno <hectorfranco@nowo.tech>
@@ -30,12 +35,15 @@ final class NowoNotifyKitBundle extends Bundle
     public const TRANSLATION_DOMAIN = 'NowoNotifyKitBundle';
 
     /**
-     * Adds the compiler passes: DoctrineBundle required, realtime mode, host pieces of the pages, Twig namespaces.
+     * Adds the compiler passes: DoctrineBundle required, the after-commit middleware on the bundle connection only,
+     * realtime mode, host pieces of the pages, Twig namespaces, the AuditKit bridge.
      */
     public function build(ContainerBuilder $container): void
     {
         parent::build($container);
         $container->addCompilerPass(new RequireDoctrinePass());
+        $container->addCompilerPass(new AfterCommitMiddlewarePass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, AfterCommitMiddlewarePass::PRIORITY);
+        $container->addCompilerPass(new AuditKitBridgePass());
         $container->addCompilerPass(new RealtimePass());
         $container->addCompilerPass(new WebUiPass());
         $container->addCompilerPass(new TwigPathsPass());

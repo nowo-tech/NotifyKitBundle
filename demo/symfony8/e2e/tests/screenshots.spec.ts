@@ -84,3 +84,12 @@ test('inbox — the inbox page', async ({ page }) => {
   await expect(page.locator('[data-testid="notify-kit-inbox"]')).toBeVisible();
   await page.screenshot({ path: resolve(outDir, 'inbox.png'), clip: await clipDemoFrame(page) });
 });
+
+test('preferences — the preferences page (S3)', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await signInAsAlice(page);
+  await page.goto('/account/notifications');
+  await page.addStyleTag({ content: '.sf-toolbar,.sf-minitoolbar,[id^="sfwdt"]{display:none!important}' });
+  await expect(page.locator('[data-testid="notify-kit-matrix"]')).toBeVisible();
+  await page.screenshot({ path: resolve(outDir, 'preferences.png'), clip: await clipDemoFrame(page) });
+});

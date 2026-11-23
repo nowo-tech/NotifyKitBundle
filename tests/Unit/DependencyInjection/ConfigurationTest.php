@@ -51,7 +51,7 @@ final class ConfigurationTest extends TestCase
             'preferences_path' => '/account/notifications',
             'layout_template'  => null,
             'templates'        => ['bell' => null, 'menu' => null, 'inbox' => null, 'preferences' => null, 'email' => null],
-            'security'         => ['access_roles' => ['ROLE_USER'], 'access_checker' => null],
+            'security'         => ['access_roles' => ['ROLE_USER'], 'access_checker' => null, 'preferences_roles' => null, 'preferences_access_checker' => null],
         ], $config['web_ui']);
         self::assertSame(['enabled' => false, 'path_prefix' => '/admin/notifications', 'security' => ['access_roles' => ['ROLE_ADMIN'], 'access_checker' => null, 'allow_unauthenticated' => false]], $config['admin_ui']);
         self::assertSame(['enabled' => false, 'prefix' => '/api'], $config['api']);
@@ -78,7 +78,7 @@ final class ConfigurationTest extends TestCase
             'links'       => ['base_url' => 'https://app.example.com/base'],
             'schedule'    => ['enabled' => true, 'digests' => '0 * * * *'],
             'bridges'     => ['slack_kit' => false, 'pwa' => true],
-            'web_ui'      => ['enabled' => true, 'path_prefix' => '/inbox', 'security' => ['access_roles' => ['ROLE_MEMBER']]],
+            'web_ui'      => ['enabled' => true, 'path_prefix' => '/inbox', 'security' => ['access_roles' => ['ROLE_MEMBER'], 'preferences_roles' => ['ROLE_MEMBER', 'ROLE_GUEST']]],
             'admin_ui'    => ['enabled' => true, 'security' => ['access_checker' => 'app.ops']],
             'api'         => ['enabled' => true, 'prefix' => '/v-api'],
         ]);
@@ -87,6 +87,7 @@ final class ConfigurationTest extends TestCase
         self::assertSame(['in_app' => true, 'mail' => false], $config['types']['invitation_accepted']['channels']);
         self::assertSame('https://app.example.com/base', $config['links']['base_url']);
         self::assertSame('Europe/Madrid', $config['quiet_hours']['default_timezone']);
+        self::assertSame(['ROLE_MEMBER', 'ROLE_GUEST'], $config['web_ui']['security']['preferences_roles']);
     }
 
     /**
@@ -128,6 +129,9 @@ final class ConfigurationTest extends TestCase
         yield 'base url slash' => [['links' => ['base_url' => 'https://example.com/']], 'Expected null or an absolute http(s) URL'];
         yield 'cron' => [['schedule' => ['retention' => 'nightly']], 'Expected a five-field cron expression'];
         yield 'path' => [['web_ui' => ['preferences_path' => '/account/notifications/']], 'Expected an absolute path without a trailing slash'];
+        yield 'preferences roles not a list' => [['web_ui' => ['security' => ['preferences_roles' => 'ROLE_USER']]], 'Expected null or a list of role names'];
+        yield 'preferences roles keyed' => [['web_ui' => ['security' => ['preferences_roles' => ['a' => 'ROLE_USER']]]], 'Expected null or a list of role names'];
+        yield 'preferences roles empty name' => [['web_ui' => ['security' => ['preferences_roles' => ['']]]], 'Expected null or a list of role names'];
         yield 'api prefix' => [['api' => ['prefix' => 'api']], 'Expected an absolute path without a trailing slash'];
     }
 

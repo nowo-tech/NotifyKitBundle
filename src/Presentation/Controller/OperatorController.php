@@ -6,6 +6,7 @@ namespace Nowo\NotifyKitBundle\Presentation\Controller;
 
 use DateTimeImmutable;
 use DateTimeZone;
+use Nowo\NotifyKitBundle\Application\Audit\AuditTrailInterface;
 use Nowo\NotifyKitBundle\Application\Retention\Retention;
 use Nowo\NotifyKitBundle\Contract\Message\PruneNotificationsMessage;
 use Nowo\NotifyKitBundle\Contract\Security\OperatorAccessCheckerInterface;
@@ -31,6 +32,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Contracts\Translation\TranslatorInterface;
+use Throwable;
 use Twig\Environment;
 
 use function sprintf;
@@ -38,7 +40,7 @@ use function sprintf;
 /**
  * The operator page (contract §8.4): counts of the inbox (all rows, unread rows, live dedupe markers, rows written per
  * type in the last {@see self::DAYS} days), the delivery set-up and *Run retention now* (POST + CSRF
- * `nowo_notify_kit_operator`, logged). Never notification content, never a recipient. Access: the operator access
+ * `nowo_notify_kit_operator`, logged and, with the AuditKit bridge, audited). Never notification content, never a recipient. Access: the operator access
  * checker (`admin_ui.security`, `ROLE_ADMIN` by default; REQ-UI-002).
  *
  * Stateless (worker mode).
@@ -57,6 +59,7 @@ final readonly class OperatorController
     /**
      * @param string $realtime the effective realtime mode (`mercure`, `host`, `poll`, `off`)
      * @param string|null $layout `web_ui.layout_template`
+     * @param AuditTrailInterface|null $audit the audit trail (S3; AuditKit bridge): *Run retention now* is recorded
      */
     public function __construct(
         private NotificationStoreInterface $store,
@@ -72,6 +75,7 @@ final readonly class OperatorController
         private ?LoggerInterface $logger = null,
         private string $realtime = 'poll',
         private ?string $layout = null,
+        private ?AuditTrailInterface $audit = null,
     ) {
     }
 
@@ -120,6 +124,17 @@ final readonly class OperatorController
             'dedupe'   => $report->dedupe,
             'complete' => !$report->remainder instanceof PruneNotificationsMessage,
         ]);
+        try {
+            $this->audit?->record(AuditTrailInterface::RETENTION_RUN, $user === null ? null : $this->current->recipientOf($user), [
+                'read'     => $report->read,
+                'trimmed'  => $report->trimmed,
+                'dedupe'   => $report->dedupe,
+                'complete' => !$report->remainder instanceof PruneNotificationsMessage,
+            ]);
+        } catch (Throwable $exception) {
+            // The retention work is committed: a failing audit trail is logged, never answered as an error (ZAL-I2).
+            ($this->logger ?? new NullLogger())->error('nowo_notify_kit: the audit trail could not record the retention run: {class}', ['class' => $exception::class, 'exception' => $exception]);
+        }
         $session = $request->hasSession() ? $request->getSession() : null;
         if ($session instanceof FlashBagAwareSessionInterface) {
             $key = $report->remainder instanceof PruneNotificationsMessage ? $queued ? 'notify.operator.retention_queued' : 'notify.operator.retention_partial' : ('notify.operator.retention_done');

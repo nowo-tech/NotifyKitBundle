@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Nowo\NotifyKitBundle\Domain\StoredPreference (contract 221-B §5.1 notify_preference, slice S3): one deviation of a
+  person from the defaults. context_key '' = account level; category '*' = master / context switch; channel '*' = every
+  channel. Prefix and binary collation as for Notification.orm.xml.
+-->
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\NotifyKitBundle\Domain\StoredPreference" table="notify_preference" read-only="true">
+        <unique-constraints>
+            <unique-constraint name="uniq_notify_preference_cell" columns="recipient_type,recipient_id,context_key,category,channel"/>
+        </unique-constraints>
+
+        <id name="id" type="string" column="id" length="36"/>
+
+        <field name="recipientType" type="string" column="recipient_type" length="32"/>
+        <field name="recipientId" type="string" column="recipient_id" length="128"/>
+        <field name="contextKey" type="string" column="context_key" length="100"/>
+        <field name="category" type="string" column="category" length="64"/>
+        <field name="channel" type="string" column="channel" length="32"/>
+        <field name="enabled" type="boolean" column="enabled"/>
+        <field name="scope" type="string" column="scope" length="16" nullable="true"/>
+        <field name="updatedAt" type="datetime_immutable" column="updated_at"/>
+    </entity>
+</doctrine-mapping>

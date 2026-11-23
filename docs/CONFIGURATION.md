@@ -51,7 +51,11 @@ nowo_notify_kit:
         preferences_path: '/account/notifications'
         layout_template: null
         templates: { bell: null, menu: null, inbox: null, preferences: null, email: null }
-        security: { access_roles: ['ROLE_USER'], access_checker: null }
+        security:
+            access_roles: ['ROLE_USER']
+            access_checker: null
+            preferences_roles: null                 # S3; null = access_roles
+            preferences_access_checker: null        # S3; PreferencesAccessCheckerInterface service
     admin_ui:
         enabled: false
         path_prefix: '/admin/notifications'
@@ -64,7 +68,7 @@ nowo_notify_kit:
 | --- | --- |
 | `enabled`, `doctrine`, `recipient` (`type`, `class`, `id_field`, `resolver`), `access` (write time), `types`, `categories`, `inbox.repeat_window_seconds`, `fan_out.max_recipients`, `retention` (`read_days`, `keep_per_recipient`, `batch_size`), `messenger` | S1 |
 | `recipient.directory`, `access` (read time), `inbox.menu_limit` / `page_size`, `realtime`, `web_ui`, `admin_ui` | S2 |
-| `preferences` | S3 |
+| `preferences`, `web_ui.preferences_path`, `web_ui.templates.preferences`, `web_ui.security.preferences_*`, `bridges.audit_kit` | S3 |
 | `channels`, `delivery`, `quiet_hours`, `digest`, `fan_out.chunk`, `limits`, `links`, `schedule`, `retention.delivery_log_days` | S4 |
 | `bridges`, `settings_provider` | S5 |
 | `api` | S6 |
@@ -98,10 +102,24 @@ nowo_notify_kit:
 | `realtime.poll_seconds` | Poll interval of the bell (paused while the tab is hidden) |
 | `realtime.subscriber_cookie` | `true`: the bell sets the Mercure subscriber cookie for the person's own topic. `false`: no cookie; your JWT must hold `RealtimeTopics::subscribeClaimFor()` ([USAGE](USAGE.md#the-mercure-subscriber-cookie)) |
 | `realtime.publisher` | Your `RealtimePublisherInterface` service (used as is; effective mode `host`) |
-| `preferences.contexts.provider` | Your `ContextProviderInterface` service (context labels on the rows; the per-context matrix arrives in S3) |
+| `preferences.contexts.provider` | Your `ContextProviderInterface` service (context labels on the rows; S3: the per-context switches and overrides) |
 | `web_ui.enabled` / `path_prefix` / `layout_template` / `templates.{bell,menu,inbox}` | The inbox page, bell endpoints and templates; needs `recipient.class` or `recipient.resolver`, Twig, forms, CSRF and SecurityBundle |
 | `web_ui.security.access_roles` / `access_checker` | REQ-UI-002: one of the roles (`[]` = any logged-in person), or your `InboxAccessCheckerInterface` service |
 | `admin_ui.enabled` / `path_prefix` / `security.*` | The operator page: `access_roles` (`ROLE_ADMIN`), `access_checker` (`OperatorAccessCheckerInterface`), `allow_unauthenticated` (demo only: also lets the page run without SecurityBundle) |
+
+### Keys read in S3
+
+| Key | Effect |
+| --- | --- |
+| `types.<key>.channels` / `locked_channels` / `in_app_optional` / `in_matrix` | The matrix: its columns are `in_app` plus every channel a registered type names; a category's cell is on by default when one of its types is; a cell is locked (always on, no checkbox) when every type of the category locks that channel. `in_app` is locked unless `in_app_optional: true` (Q-O2); `in_matrix: false` keeps a type's category off the page |
+| `preferences.scopes` | `[all, involved]` shows a scope select per category; `[all]` hides it (a save with `involved` is refused) |
+| `preferences.contexts.provider` | Your `ContextProviderInterface` service: `contextsFor()` is the list of contexts a person may switch off or override (**only these**: any other context is refused, 404 on the page) |
+| `web_ui.preferences_path` | Path of the preferences page and its endpoints (default `/account/notifications`) |
+| `web_ui.templates.preferences` | Your page template (extend `@!NowoNotifyKitBundle/preferences/index.html.twig`) |
+| `web_ui.security.preferences_roles` | Roles that open the preferences page; `null` (default) = `access_roles`; `[]` = any logged-in person |
+| `web_ui.security.preferences_access_checker` | Your `PreferencesAccessCheckerInterface` service (REQ-UI-002) |
+| `bridges.audit_kit` | `auto` (default): record `notify.preferences_changed` and `notify.retention_run` in AuditKit's action log when it is on **and** `nowo_audit_kit.action_log.flush_mode` is `isolated` (otherwise off, with a container log line: the bundle never flushes your entity manager); `true`: refuse to build without it or in another flush mode; `false`: never |
+| `fan_out.max_recipients` | Also caps `NotificationRequest::$involved` (audit QL-I3) |
 
 ## Container parameters
 

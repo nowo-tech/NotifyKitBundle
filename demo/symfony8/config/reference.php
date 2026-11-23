@@ -1350,6 +1350,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     realtime?: array{
  *         mode?: "auto"|"mercure"|"poll"|"off"|Param, // auto = Mercure when installed, else poll // Default: "auto"
  *         poll_seconds?: int|Param, // Default: 60
+ *         subscriber_cookie?: bool|Param, // false = the bell sets no Mercure subscriber cookie; your own JWT must hold RealtimeTopics::subscribeClaimFor() // Default: true
  *         publisher?: scalar|Param|null, // RealtimePublisherInterface service; null = bundle publisher // Default: null
  *     },
  *     preferences?: array{
@@ -1424,6 +1425,8 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         security?: array{
  *             access_roles?: list<scalar|Param|null>,
  *             access_checker?: scalar|Param|null, // InboxAccessCheckerInterface service; null = the role checker // Default: null
+ *             preferences_roles?: mixed, // Roles that open the preferences page (S3); null = access_roles; [] = any logged-in user // Default: null
+ *             preferences_access_checker?: scalar|Param|null, // PreferencesAccessCheckerInterface service; null = the role checker on preferences_roles // Default: null
  *         },
  *     },
  *     admin_ui?: array{

@@ -27,7 +27,8 @@ EntityManager.
 
 Available: the entry point, the in-app rows (coalescing, dedupe, write-time access), the type registry, retention, the
 schema check, transaction-safe writes (S1); read-time visibility, the inbox read side, the header bell, the inbox and
-operator pages and the realtime badge (S2, in review). Planned (see the roadmap): the rest.
+operator pages and the realtime badge (S2, in review); the preferences matrix, its page with autosave and the AuditKit
+bridge (S3, in review). Planned (see the roadmap): the rest.
 
 - **One entry point**, `NotifierInterface::notify()`: type, recipients (by id), actor, context, target, local URL,
   params, urgency, *involved* people; validated, written after your commit, fanned out per recipient and channel.
@@ -35,7 +36,8 @@ operator pages and the realtime badge (S2, in review). Planned (see the roadmap)
   repeats, read / unread / mark all, unread count, visibility re-checked at read time, retention.
 - **Header bell and inbox page** on UiKit + FormKit, with a real-time badge (Mercure private updates, or a bounded poll).
 - **Preferences matrix** per person × category × channel (only deviations stored), *all* / *involved* scope, master
-  switch, per-context switches and overrides; the bell row is always written by default (Q-O2).
+  switch, per-context switches and overrides, a preferences page with autosave (optimistic, 409 when stale) and an
+  AuditKit trail of the changes; the bell row is always written by default (Q-O2).
 - **Quiet hours and digests** for mail, push and Slack (time zone, weekdays, urgent bypass; hourly / daily digests).
 - **Channels**: built-in `in_app`; bridges for mail (Symfony Mailer + MailKit branding), push (PwaBundle) and Slack
   (SlackKit); your own channels through `ChannelInterface`.
@@ -74,6 +76,8 @@ Every key of the contract is already accepted (strict tree): [docs/CONFIGURATION
 ![The header bell](docs/images/demo/bell.webp)
 
 ![The inbox page](docs/images/demo/inbox.webp)
+
+![The preferences page](docs/images/demo/preferences.webp)
 
 ## Documentation
 

@@ -32,7 +32,9 @@ interface TypeRegistryInterface
     public function categories(): array;
 
     /**
-     * @return list<string> the channels the bundle can deliver to (S1: `in_app`)
+     * @return list<string> the channels of the preferences matrix: `in_app` first, then every channel a registered type
+     *                      names in its default or locked channels, in declaration order (delivery to out-of-band
+     *                      channels starts in S4; hosts may already read the preferences for their own alerts)
      */
     public function channels(): array;
 }

@@ -76,10 +76,19 @@ final readonly class TypeDefinition
     }
 
     /**
+     * Whether $channel is on by default for this type: its `defaultChannels` value; a channel it does not name is off,
+     * except `in_app`, which is on (the bell is written unless the type turns it off; audit ZAL-2).
+     */
+    public function isDefaultOn(string $channel): bool
+    {
+        return $this->defaultChannels[$channel] ?? $channel === self::IN_APP;
+    }
+
+    /**
      * Whether the in-app row (the bell) is written for this type (S1: on unless the type turns it off by default).
      */
     public function writesInApp(): bool
     {
-        return ($this->defaultChannels[self::IN_APP] ?? true) || in_array(self::IN_APP, $this->lockedChannels, true);
+        return $this->isDefaultOn(self::IN_APP) || in_array(self::IN_APP, $this->lockedChannels, true);
     }
 }

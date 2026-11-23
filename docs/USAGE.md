@@ -16,6 +16,11 @@
 - [Realtime badge (S2)](#realtime-badge-s2)
   - [The Mercure subscriber cookie](#the-mercure-subscriber-cookie)
   - [What publishing costs](#what-publishing-costs)
+- [Preferences (S3)](#preferences-s3)
+  - [The preferences page](#the-preferences-page)
+  - [Preferences from code](#preferences-from-code)
+  - [Audit trail (AuditKit)](#audit-trail-auditkit)
+- [Browser console](#browser-console)
 - [Retention and schema check](#retention-and-schema-check)
 - [Using it from a DDD / hexagonal application](#using-it-from-a-ddd--hexagonal-application)
 - [FrankenPHP worker mode](#frankenphp-worker-mode)
@@ -238,6 +243,127 @@ the request:
   on the bus, with `Symfony\Component\Mercure\Update` routed to an async transport (symfony/mercure's `UpdateHandler`
   sends it).
 - Or `realtime.mode: poll` / `off`.
+
+## Preferences (S3)
+
+Each person chooses, per **category** (rows) and **channel** (columns), whether a notification reaches them, and for
+whom: everything (`all`) or only when they are among the request's `involved` people. Only deviations from the
+defaults are stored (`<prefix>notify_preference`); setting a cell back to its default deletes the row.
+
+```yaml
+nowo_notify_kit:
+    types:
+        issue.assigned: { category: issues, permission: issue.view, channels: { in_app: true, mail: true } }
+        mention.added:  { category: mentions, in_app_optional: true }   # the bell row may be turned off (Q-O2)
+    categories:
+        issues: { label: notify.category.issues, group: work, order: 10 }
+    preferences:
+        scopes: [all, involved]                     # [all] hides the scope select
+        contexts: { provider: App\Notifications\ProjectContexts }   # ContextProviderInterface: the person's projects
+```
+
+**Merge order** (Beacon's, contract §14), for one type, channel and context:
+
+1. a channel the type locks (`in_app` unless `in_app_optional`, plus `locked_channels`) is always on;
+2. the **master switch** off (`''`, `*`, `*`) → off;
+3. the **context switch** off (`project:42`, `*`, `*`) → off;
+4. the **context × category override** (`project:42`, `issues`, `mail`, else `project:42`, `issues`, `*`);
+5. the **account × category** row (`''`, `issues`, `mail`, else `''`, `issues`, `*`);
+6. the type's default channel (`types.<key>.channels`).
+
+**What S3 changes in `notify()`.** The in-app row of a type with `in_app_optional: true` now follows the person's
+preferences (one query for all recipients; `NotifyResult::$skippedPreference`, `NotificationSkippedEvent` with reason
+`preference`). A type whose bell row is locked (the default) reads nothing and behaves as before. With nothing stored,
+a type gets **its category's default** (on when one of the category's types is on by default, `in_app` on unless a type
+turns it off): exactly what the page shows, so what a person sees is what is delivered. Keep types whose defaults must
+differ in separate categories. The other channels
+(`mail`, `push`, `slack`) are delivered from S4; their preferences can be stored and read now, so a host may already
+use them for its own alerts (`PreferenceMatrix::resolveType()`). `NotificationRequest::$involved` is capped at
+`fan_out.max_recipients` (audit QL-I3).
+
+### The preferences page
+
+`GET {web_ui.preferences_path}` (default `/account/notifications`, imported with the other routes while
+`web_ui.enabled`):
+
+- the **master switch**, the matrix (a checkbox per cell; a locked cell shows *Always on*; a scope select per category
+  when `preferences.scopes` has both values), and the person's **contexts** from `ContextProviderInterface::contextsFor()`
+  with an on / off switch and a *Customise* link;
+- *Customise* opens that context's overrides (`…/context?key=project:42`): a page of its own without JavaScript, a
+  dialog loaded on demand with it, plus *Reset to account settings* (deletes the overrides, keeps the switch);
+- **autosave**: with the preferences script every change is saved at once (`POST …/cells`, JSON, `X-CSRF-TOKEN`) and a
+  polite status line says *Saving…* / *Saved*; without JavaScript the form saves with its button and only the cells
+  that differ from what the page showed are written.
+
+| Rule | Answer |
+| --- | --- |
+| Not logged in | Your firewall's login answer (401 / redirect) |
+| No role of `web_ui.security.preferences_roles` (default: `access_roles`), refused by your `PreferencesAccessCheckerInterface`, or a user the recipient resolver refuses | 403 |
+| A context the provider does not list **for this person** | 404 (page, fragment, save and reset) |
+| Missing or wrong CSRF token (`nowo_notify_kit_preferences`) | 403 |
+| A cell changed meanwhile in another tab, device or request (the token the page showed no longer holds) | **409** `{"ok":false,"error":"stale","code":"CONFLICT_001","cells":[…current…]}` (the no-JS form: the page again with a notice, status 409); nothing of the save was written |
+| A lock wait or deadlock | **409** + `Retry-After` + `CONFLICT_001` (the script retries once) |
+| A locked cell, unknown category / channel, a scope the configuration refuses, a malformed body | 422 (JSON) / 403 (form) |
+
+There is no recipient anywhere in the requests: the person is always the logged-in one, from the token storage.
+
+```yaml
+# config/packages/security.yaml (layer 1 of REQ-UI-002)
+security:
+    access_control:
+        - { path: ^/account/notifications, roles: ROLE_USER }
+```
+
+### Preferences from code
+
+```php
+use Nowo\NotifyKitBundle\Contract\PreferenceChange;
+use Nowo\NotifyKitBundle\Contract\PreferenceChangeSet;
+use Nowo\NotifyKitBundle\Contract\PreferenceExpectation;
+use Nowo\NotifyKitBundle\Contract\PreferenceKey;
+use Nowo\NotifyKitBundle\Contract\PreferencesInterface;
+use Nowo\NotifyKitBundle\Contract\Scope;
+
+$matrix = $preferences->matrixFor($me);                           // every row of mine; or matrixFor($me, $project)
+$matrix->resolve('issues', 'mail', $project)->lets($involved);    // the merge order above
+$stored = $matrix->stored(PreferenceKey::account('issues', 'mail')); // null = follows the default
+
+$preferences->save($me, new PreferenceChangeSet([
+    new PreferenceChange(PreferenceKey::account('issues', 'mail'), false, Scope::All, PreferenceExpectation::of($stored)),
+    new PreferenceChange(PreferenceKey::forContext($project, PreferenceKey::ANY, PreferenceKey::ANY), false),
+]));                                                               // all or nothing; PreferenceConflictException when stale
+$preferences->resetContext($me, $project);                         // *Reset to account settings*
+```
+
+`save()` checks every change (a category and channel of the matrix, not locked, an allowed scope, and a context that
+`ContextProviderInterface::contextsFor($me)` lists: without a provider no context can be saved) and writes the cells in
+one transaction, each with one conditional statement. A change without an expectation (`expected: null`) is
+"last write wins". After the commit `PreferencesChangedEvent` carries the changed cells (`PreferenceKey`, never their
+values). Concurrency: [CONCURRENCY.md](CONCURRENCY.md#write-paths).
+
+### Audit trail (AuditKit)
+
+With nowo-tech/audit-kit-bundle 2.x, its action log on (`nowo_audit_kit.action_log.entity_class`) **and**
+`nowo_audit_kit.action_log.flush_mode: isolated` (the 2.x default), `bridges.audit_kit: auto` records:
+
+| Action | Actor / subject | Context |
+| --- | --- | --- |
+| `notify.preferences_changed` | the person / the person (recipient id) | `recipient_type`, `changed` (at most 50 cell keys such as `account/issues/mail`, `project:42/*/*`), `count`, `reset` |
+| `notify.retention_run` | the operator's recipient id (null when the operator has none) | `read`, `trimmed`, `dedupe`, `complete` (counts) |
+
+Rows go through `recordIdsAndFlush()` after the bundle's commit. In `isolated` mode AuditKit writes only the new row
+through its own short-lived entity manager: **the bundle never flushes your entity manager**, so your pending changes stay
+pending (REQ-ARCH-001 rule 6). With `flush_mode: host` AuditKit would flush your entity manager with every pending change,
+so the bridge is not wired: `auto` leaves it off (with a line in the container build log), `true` refuses to build.
+AuditKit < 2.0 is a conflict of the package. A failure of the audit write is logged and never undoes the change, nor
+turns *Run retention now* into an error. No notification content, value or other person is ever written.
+
+## Browser console
+
+Each bundle script logs one line when it loads (REQ-ASSETS-005): `📦 [notify-kit/bell] script loaded, build: …` and
+`📦 [notify-kit/preferences] script loaded, build: 2026-11-23 14:05 UTC` (the build is the committed
+`build-info.json` `builtAt`). Turn it off with `<html data-nowo-console="quiet">` or `globalThis.NOWO_CONSOLE =
+'quiet'` before the script runs. Nothing else is printed.
 
 ## Retention and schema check
 

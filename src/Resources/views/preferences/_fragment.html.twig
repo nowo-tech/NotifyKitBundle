@@ -1,0 +1,8 @@
+{#
+  A context's overrides for the dialog the preferences script loads on demand (GET …/context?key=…&fragment=1): only
+  the grid, wrapped in an element that carries the dialog title. The script keeps the [data-nowo-notify-kit-preferences]
+  element and drops anything else. Variables as preferences/index.html.twig.
+#}
+<div data-nowo-notify-kit-fragment data-title="{{ 'notify.preferences.context_title'|trans({'%context%': grid.contextLabel}, 'NowoNotifyKitBundle') }}">
+    {% include '@NowoNotifyKitBundle/preferences/_matrix.html.twig' with {grid: grid, form: form, cells_url: cells_url, csrf: csrf, bundle: page.bundle} only %}
+</div>

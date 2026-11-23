@@ -22,3 +22,4 @@ security:
   access_control:
     - { path: ^/admin/notifications, roles: ROLE_ADMIN }
     - { path: ^/notifications, roles: ROLE_USER }
+    - { path: ^/account/notifications, roles: ROLE_USER }

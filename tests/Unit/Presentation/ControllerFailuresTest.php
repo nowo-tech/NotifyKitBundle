@@ -6,6 +6,7 @@ namespace Nowo\NotifyKitBundle\Tests\Unit\Presentation;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\Persistence\ManagerRegistry;
+use Nowo\NotifyKitBundle\Application\Audit\AuditTrailInterface;
 use Nowo\NotifyKitBundle\Application\Default\NoContextProvider;
 use Nowo\NotifyKitBundle\Application\Default\ResolverRecipientDirectory;
 use Nowo\NotifyKitBundle\Application\Retention\Retention;
@@ -22,11 +23,13 @@ use Nowo\NotifyKitBundle\Presentation\Http\CurrentRecipient;
 use Nowo\NotifyKitBundle\Presentation\Security\RoleAccessChecker;
 use Nowo\NotifyKitBundle\Presentation\Title\NotificationTitles;
 use Nowo\NotifyKitBundle\Presentation\View\RelativeTime;
+use Nowo\NotifyKitBundle\Tests\Fixtures\MemoryLogger;
 use Nowo\NotifyKitBundle\Tests\Fixtures\Sqlite;
 use Nowo\NotifyKitBundle\Tests\Fixtures\SteppingClock;
 use Nowo\NotifyKitBundle\Tests\Fixtures\Web\WebRecipientResolver;
 use Nowo\TransactionContract\TransientStorageFailure;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Symfony\Component\Form\Extension\Csrf\CsrfExtension;
 use Symfony\Component\Form\Extension\HttpFoundation\HttpFoundationExtension;
 use Symfony\Component\Form\FormFactoryInterface;
@@ -48,6 +51,8 @@ use Symfony\Component\Translation\Translator;
 use Twig\Environment;
 use Twig\Loader\ArrayLoader;
 
+use function array_map;
+use function implode;
 use function json_decode;
 use function json_encode;
 
@@ -123,6 +128,19 @@ final class ControllerFailuresTest extends TestCase
         $this->expectException(HttpException::class);
         $this->expectExceptionMessage('CONFLICT_001');
         $this->operator($store, new Retention($failing, $this->transactions($connection)), null)->retention($this->form());
+    }
+
+    public function testAFailingAuditTrailNeverTurnsACommittedRetentionRunIntoAnError(): void
+    {
+        $connection = Sqlite::connection();
+        $store      = new DbalNotificationStore($this->transactions($connection));
+        $audit      = $this->createStub(AuditTrailInterface::class);
+        $audit->method('record')->willThrowException(new RuntimeException('audit store down'));
+        $logger     = new MemoryLogger();
+        $controller = new OperatorController($store, new Retention($store, $this->transactions($connection)), $this->current(), new RoleAccessChecker(null, []), $this->forms(), new Environment(new ArrayLoader()), $this->router(), new Translator('en'), null, null, $logger, audit: $audit);
+
+        self::assertSame('/admin', $controller->retention($this->form())->getTargetUrl(), 'ZAL-I2: the run is committed, the answer is the redirect');
+        self::assertStringContainsString('could not record the retention run', implode("\n", array_map(static fn (array $record): string => $record[1], $logger->records)));
     }
 
     private function flashes(Request $request): string

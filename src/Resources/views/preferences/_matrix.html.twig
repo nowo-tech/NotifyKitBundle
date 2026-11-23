@@ -1,0 +1,88 @@
+{#
+  The preferences grid (contract §8.3), embeddable (Beacon's display drawer). Variables: grid
+  (Presentation\View\PreferenceGrid), form (FormView of PreferencesType), cells_url, csrf, bundle.
+
+  Rows are the categories, columns the channels; a locked cell (the type keeps that channel on) shows "Always on"
+  instead of a checkbox. Each checkbox carries its cell (data-context / data-category / data-channel) and the id of its
+  hidden token (data-token-id), the stored state the page showed; the script sends that token with each change, so a
+  change made meanwhile elsewhere is refused (409) instead of overwritten. Plain text is printed escaped; context
+  labels sit in <bdi dir="auto">.
+#}
+{%- set _d = 'NowoNotifyKitBundle' -%}
+{%- set _hidden = {class: 'nowo-notify-kit-visually-hidden'} -%}
+{%- set _scoped = false -%}
+{%- for row in grid.rows -%}{%- if row.scopeField -%}{%- set _scoped = true -%}{%- endif -%}{%- endfor -%}
+<div class="nowo-notify-kit-prefs" data-nowo-notify-kit-preferences
+    data-cells-url="{{ cells_url }}"
+    data-csrf-token="{{ csrf }}"
+    data-saving-label="{{ 'notify.preferences.saving'|trans({}, _d) }}"
+    data-saved-label="{{ 'notify.preferences.saved_short'|trans({}, _d) }}"
+    data-stale-label="{{ 'notify.preferences.stale'|trans({}, _d) }}"
+    data-error-label="{{ 'notify.preferences.error'|trans({}, _d) }}"
+    data-close-label="{{ 'notify.preferences.close'|trans({}, _d) }}"
+    data-testid="notify-kit-preferences-grid">
+{{ form_start(form, {attr: {class: nowo_ui_class('form', bundle), 'data-nowo-notify-kit-form': ''}}) }}
+    {% if grid.switch %}
+        {% set _f = grid.switch.field %}
+        <div class="nowo-notify-kit-prefs__switch">
+            {{ form_widget(form[_f], {attr: {'data-nowo-notify-kit-cell': '', 'data-context': '', 'data-category': '*', 'data-channel': '*', 'data-token-id': form['k' ~ _f].vars.id, 'data-testid': 'notify-kit-master'}}) }}
+            {{ form_label(form[_f]) }}
+        </div>
+    {% endif %}
+    <table class="{{ nowo_ui_class('table', bundle) }} nowo-notify-kit-prefs__matrix" data-testid="notify-kit-matrix">
+        <caption class="nowo-notify-kit-visually-hidden">{{ 'notify.preferences.matrix_caption'|trans({}, _d) }}</caption>
+        <thead>
+            <tr>
+                <th scope="col">{{ 'notify.preferences.category'|trans({}, _d) }}</th>
+                {% for label in grid.channels %}<th scope="col">{{ label }}</th>{% endfor %}
+                {% if _scoped %}<th scope="col">{{ 'notify.preferences.scope'|trans({}, _d) }}</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+        {% for row in grid.rows %}
+            <tr data-category="{{ row.category }}">
+                <th scope="row">{{ row.label|trans({}, _d) }}</th>
+                {% for cell in row.cells %}
+                    <td>
+                        {%- if cell.field -%}
+                            {{ form_widget(form[cell.field], {attr: {'data-nowo-notify-kit-cell': '', 'data-context': grid.contextKey, 'data-category': row.category, 'data-channel': cell.channel, 'data-token-id': form['k' ~ cell.field].vars.id, 'data-testid': 'notify-kit-cell-' ~ row.category ~ '-' ~ cell.channel}}) }}
+                            {{ form_label(form[cell.field], null, {label_attr: _hidden}) }}
+                        {%- else -%}
+                            <span class="nowo-notify-kit-prefs__locked" data-testid="notify-kit-locked-{{ row.category }}-{{ cell.channel }}">{{ 'notify.preferences.locked'|trans({}, _d) }}<span class="nowo-notify-kit-visually-hidden"> ({{ cell.label }})</span></span>
+                        {%- endif -%}
+                    </td>
+                {% endfor %}
+                {% if _scoped %}
+                    <td>
+                        {%- if row.scopeField -%}
+                            {{ form_label(form[row.scopeField], null, {label_attr: _hidden}) }}
+                            {{ form_widget(form[row.scopeField], {attr: {'data-nowo-notify-kit-scope': '', 'data-context': grid.contextKey, 'data-category': row.category, 'data-testid': 'notify-kit-scope-' ~ row.category}}) }}
+                        {%- endif -%}
+                    </td>
+                {% endif %}
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% if grid.contexts is not empty %}
+        <fieldset class="nowo-notify-kit-prefs__contexts" data-testid="notify-kit-contexts">
+            <legend>{{ 'notify.preferences.contexts'|trans({}, _d) }}</legend>
+            <ul>
+            {% for context in grid.contexts %}
+                <li>
+                    {{ form_widget(form[context.field], {attr: {'data-nowo-notify-kit-cell': '', 'data-context': context.contextKey, 'data-category': '*', 'data-channel': '*', 'data-token-id': form['k' ~ context.field].vars.id, 'data-testid': 'notify-kit-context-' ~ loop.index0}}) }}
+                    {{ form_label(form[context.field]) }}
+                    {%- if context.group %} <small><bdi dir="auto">{{ context.group }}</bdi></small>{% endif %}
+                    <a href="{{ context.href }}" data-nowo-notify-kit-override data-testid="notify-kit-override-{{ loop.index0 }}">{{ 'notify.preferences.customise'|trans({}, _d) }}<span class="nowo-notify-kit-visually-hidden"> (<bdi dir="auto">{{ context.label }}</bdi>)</span></a>
+                    {%- if context.overridden %} <small data-testid="notify-kit-overridden-{{ loop.index0 }}">{{ 'notify.preferences.customised'|trans({}, _d) }}</small>{% endif %}
+                </li>
+            {% endfor %}
+            </ul>
+        </fieldset>
+    {% endif %}
+    <p class="nowo-notify-kit-prefs__status" role="status" data-nowo-notify-kit-status></p>
+    <div class="{{ nowo_ui_class('form_actions', bundle) }}" data-nowo-notify-kit-submit>
+        <button type="submit" class="{{ nowo_ui_class('btn_primary', bundle) }}" data-testid="notify-kit-preferences-submit">{{ 'notify.preferences.save'|trans({}, _d) }}</button>
+    </div>
+{{ form_end(form) }}
+</div>

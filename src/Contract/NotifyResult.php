@@ -18,6 +18,7 @@ final readonly class NotifyResult
      * @param bool $deduplicated the whole request was dropped (same dedupe key within 24 hours)
      * @param int $enqueued out-of-band deliveries enqueued (from S4; always 0 in S1)
      * @param list<NotificationId> $notificationIds the rows written or updated, in recipient order
+     * @param int $skippedPreference recipients skipped because their preferences turn the in-app row off (S3)
      */
     public function __construct(
         public int $written = 0,
@@ -27,6 +28,7 @@ final readonly class NotifyResult
         public bool $deduplicated = false,
         public int $enqueued = 0,
         public array $notificationIds = [],
+        public int $skippedPreference = 0,
     ) {
     }
 }

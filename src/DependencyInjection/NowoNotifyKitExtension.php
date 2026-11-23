@@ -5,28 +5,35 @@ declare(strict_types=1);
 namespace Nowo\NotifyKitBundle\DependencyInjection;
 
 use LogicException;
+use Nowo\NotifyKitBundle\Application\Audit\AuditTrailInterface;
+use Nowo\NotifyKitBundle\Application\Audit\NullAuditTrail;
 use Nowo\NotifyKitBundle\Application\Default\NoContextProvider;
 use Nowo\NotifyKitBundle\Application\Default\PersonalOnlyAccessChecker;
 use Nowo\NotifyKitBundle\Application\Default\ResolverRecipientDirectory;
 use Nowo\NotifyKitBundle\Application\Inbox;
 use Nowo\NotifyKitBundle\Application\Notifier;
+use Nowo\NotifyKitBundle\Application\Preferences\Preferences;
 use Nowo\NotifyKitBundle\Application\Realtime\RealtimeTopics;
 use Nowo\NotifyKitBundle\Application\Realtime\UnreadBadge;
 use Nowo\NotifyKitBundle\Application\Retention\Retention;
 use Nowo\NotifyKitBundle\Application\TypeRegistry;
+use Nowo\NotifyKitBundle\Application\UnitOfWorkInterface;
 use Nowo\NotifyKitBundle\Application\Visibility\VisibilityResolver;
 use Nowo\NotifyKitBundle\Contract\ContextProviderInterface;
 use Nowo\NotifyKitBundle\Contract\InboxInterface;
 use Nowo\NotifyKitBundle\Contract\NotifierInterface;
+use Nowo\NotifyKitBundle\Contract\PreferencesInterface;
 use Nowo\NotifyKitBundle\Contract\RealtimePublisherInterface;
 use Nowo\NotifyKitBundle\Contract\RecipientAccessCheckerInterface;
 use Nowo\NotifyKitBundle\Contract\RecipientDirectoryInterface;
 use Nowo\NotifyKitBundle\Contract\RecipientResolverInterface;
 use Nowo\NotifyKitBundle\Contract\Security\InboxAccessCheckerInterface;
 use Nowo\NotifyKitBundle\Contract\Security\OperatorAccessCheckerInterface;
+use Nowo\NotifyKitBundle\Contract\Security\PreferencesAccessCheckerInterface;
 use Nowo\NotifyKitBundle\Contract\TypeProviderInterface;
 use Nowo\NotifyKitBundle\Contract\TypeRegistryInterface;
 use Nowo\NotifyKitBundle\Domain\NotificationStoreInterface;
+use Nowo\NotifyKitBundle\Domain\PreferenceStoreInterface;
 use Nowo\NotifyKitBundle\Infrastructure\Console\PruneNotificationsCommand;
 use Nowo\NotifyKitBundle\Infrastructure\Console\SchemaCheckCommand;
 use Nowo\NotifyKitBundle\Infrastructure\Doctrine\NotifyKitMetadataListener;
@@ -35,6 +42,7 @@ use Nowo\NotifyKitBundle\Infrastructure\Persistence\AfterCommitMiddleware;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\AfterCommitQueue;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\AfterCommitQueueResetListener;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\DbalNotificationStore;
+use Nowo\NotifyKitBundle\Infrastructure\Persistence\DbalPreferenceStore;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\NotifyKitTransactions;
 use Nowo\NotifyKitBundle\Infrastructure\Realtime\MercureRealtimePublisher;
 use Nowo\NotifyKitBundle\Infrastructure\Realtime\MercureSubscription;
@@ -43,14 +51,17 @@ use Nowo\NotifyKitBundle\Infrastructure\Schema\SchemaChecker;
 use Nowo\NotifyKitBundle\NowoNotifyKitBundle;
 use Nowo\NotifyKitBundle\Presentation\Controller\InboxController;
 use Nowo\NotifyKitBundle\Presentation\Controller\OperatorController;
+use Nowo\NotifyKitBundle\Presentation\Controller\PreferencesController;
 use Nowo\NotifyKitBundle\Presentation\Form\ActionType;
 use Nowo\NotifyKitBundle\Presentation\Form\InboxFilterType;
+use Nowo\NotifyKitBundle\Presentation\Form\PreferencesType;
 use Nowo\NotifyKitBundle\Presentation\Http\CurrentRecipient;
 use Nowo\NotifyKitBundle\Presentation\Routing\NotifyKitRouteLoader;
 use Nowo\NotifyKitBundle\Presentation\Security\RoleAccessChecker;
 use Nowo\NotifyKitBundle\Presentation\Title\NotificationTitles;
 use Nowo\NotifyKitBundle\Presentation\Twig\BellRenderer;
 use Nowo\NotifyKitBundle\Presentation\Twig\NotifyKitTwigExtension;
+use Nowo\NotifyKitBundle\Presentation\View\PreferencePages;
 use Nowo\NotifyKitBundle\Presentation\View\RelativeTime;
 use Symfony\Component\DependencyInjection\Argument\TaggedIteratorArgument;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -73,7 +84,8 @@ use function sprintf;
  * Loads `nowo_notify_kit`: validates the strict configuration tree, publishes it as container parameters and, while
  * `enabled` is true, registers the S1 core (contract 221-B §4–§5, §6.1, §6.6, §9): the type registry, the DBAL store
  * with its after-commit middleware and transaction runner, the notifier, the inbox maintenance service, the access and
- * recipient defaults, the Doctrine metadata listener, retention (command + message handler) and the schema check.
+ * recipient defaults, the Doctrine metadata listener, retention (command + message handler) and the schema check; the
+ * S2 read side and pages; the S3 preferences (store, service, page, audit trail port).
  *
  * `enabled: false` registers no service, listener, mapping or command. The parameters always exist, so the host's
  * `security.yaml` patterns can follow `%nowo_notify_kit.api_prefix%` (one-value prefix rule).
@@ -161,7 +173,7 @@ final class NowoNotifyKitExtension extends Extension implements PrependExtension
         $adminUi = $config['enabled'] && $config['admin_ui']['enabled'];
         // The loader always exists (an import of the routes file never fails); it adds routes only for enabled UIs.
         $container->register(NotifyKitRouteLoader::class, NotifyKitRouteLoader::class)
-            ->setArguments([$webUi, $config['web_ui']['path_prefix'], $adminUi, $config['admin_ui']['path_prefix'], '%kernel.environment%'])
+            ->setArguments([$webUi, $config['web_ui']['path_prefix'], $adminUi, $config['admin_ui']['path_prefix'], '%kernel.environment%', $config['web_ui']['preferences_path']])
             ->addTag('routing.loader');
         if (!$config['enabled']) {
             return;
@@ -246,10 +258,15 @@ final class NowoNotifyKitExtension extends Extension implements PrependExtension
             $doctrine['entity_manager'],
             $doctrine['transaction_runner'] !== null ? new Reference($doctrine['transaction_runner']) : null,
         ]);
+        $container->setAlias(UnitOfWorkInterface::class, self::TRANSACTIONS);
         $transactions = new Reference(self::TRANSACTIONS);
         $container->register(DbalNotificationStore::class, DbalNotificationStore::class)->setArguments([$transactions, $doctrine['table_prefix']]);
         $container->setAlias(NotificationStoreInterface::class, DbalNotificationStore::class);
         $store = new Reference(NotificationStoreInterface::class);
+        $container->register(DbalPreferenceStore::class, DbalPreferenceStore::class)->setArguments([$transactions, $doctrine['table_prefix']]);
+        $container->setAlias(PreferenceStoreInterface::class, DbalPreferenceStore::class);
+        $container->register(NullAuditTrail::class, NullAuditTrail::class);
+        $container->setAlias(AuditTrailInterface::class, NullAuditTrail::class);
 
         $container->register(TypeRegistry::class, TypeRegistry::class)
             ->setFactory([TypeRegistry::class, 'create'])
@@ -267,11 +284,16 @@ final class NowoNotifyKitExtension extends Extension implements PrependExtension
 
         $this->registerReadSide($container, $config, $store, $logger);
 
+        $container->register(Preferences::class, Preferences::class)->setArguments([
+            new Reference(PreferenceStoreInterface::class), $transactions, new Reference(TypeRegistryInterface::class), new Reference(ContextProviderInterface::class),
+            new Reference('event_dispatcher', ContainerInterface::IGNORE_ON_INVALID_REFERENCE), $clock, $config['preferences']['scopes'],
+        ]);
+        $container->setAlias(PreferencesInterface::class, Preferences::class)->setPublic(true);
         $container->register(Notifier::class, Notifier::class)->setArguments([
             $store, $transactions, new Reference(TypeRegistryInterface::class), new Reference(RecipientAccessCheckerInterface::class),
             new Reference('event_dispatcher', ContainerInterface::IGNORE_ON_INVALID_REFERENCE),
             $config['inbox']['repeat_window_seconds'], $config['fan_out']['max_recipients'], $clock, $logger,
-            new Reference(UnreadBadge::class),
+            new Reference(UnreadBadge::class), new Reference(Preferences::class),
         ]);
         $container->setAlias(NotifierInterface::class, Notifier::class)->setPublic(true);
         $container->register(Inbox::class, Inbox::class)->setArguments([
@@ -356,7 +378,7 @@ final class NowoNotifyKitExtension extends Extension implements PrependExtension
     {
         /** @var array{class: string|null, resolver: string|null} $recipient */
         $recipient = $config['recipient'];
-        /** @var array{path_prefix: string, layout_template: string|null, templates: array{bell: string|null, menu: string|null, inbox: string|null}, security: array{access_roles: list<string>, access_checker: string|null}} $web */
+        /** @var array{path_prefix: string, layout_template: string|null, templates: array{bell: string|null, menu: string|null, inbox: string|null, preferences: string|null}, security: array{access_roles: list<string>, access_checker: string|null, preferences_roles: list<string>|null, preferences_access_checker: string|null}} $web */
         $web = $config['web_ui'];
         /** @var array{security: array{access_roles: list<string>, access_checker: string|null, allow_unauthenticated: bool}} $admin */
         $admin = $config['admin_ui'];
@@ -368,7 +390,7 @@ final class NowoNotifyKitExtension extends Extension implements PrependExtension
         $authorization = new Reference('security.authorization_checker', ContainerInterface::NULL_ON_INVALID_REFERENCE);
 
         // FormKit wires its options merger into tagged types (REQ-TWIG-005).
-        foreach ([InboxFilterType::class, ActionType::class] as $type) {
+        foreach ([InboxFilterType::class, ActionType::class, PreferencesType::class] as $type) {
             $container->register($type, $type)->addTag('form.type');
         }
         $container->register(CurrentRecipient::class, CurrentRecipient::class)->setArguments([
@@ -401,6 +423,22 @@ final class NowoNotifyKitExtension extends Extension implements PrependExtension
                     '%' . self::REALTIME_MODE . '%', $config['realtime']['poll_seconds'], $web['templates']['bell'],
                 ]);
             $container->register(NotifyKitTwigExtension::class, NotifyKitTwigExtension::class)->addTag('twig.extension');
+
+            // S3: the preferences page (its own roles, inheriting access_roles when preferences_roles is null).
+            $this->checker($container, PreferencesAccessCheckerInterface::class, $web['security']['preferences_access_checker'], 'nowo_notify_kit.preferences_access_checker', [
+                $authorization, $web['security']['preferences_roles'] ?? $web['security']['access_roles'], false,
+            ]);
+            $container->register(PreferencePages::class, PreferencePages::class)->setArguments([
+                new Reference(TypeRegistryInterface::class), new Reference('translator'), $config['preferences']['scopes'], $web['layout_template'],
+            ]);
+            $container->register(PreferencesController::class, PreferencesController::class)
+                ->setPublic(true)
+                ->addTag('controller.service_arguments')
+                ->setArguments([
+                    new Reference(PreferencesInterface::class), new Reference(ContextProviderInterface::class), new Reference(CurrentRecipient::class),
+                    new Reference(PreferencesAccessCheckerInterface::class), new Reference(PreferencePages::class), new Reference('form.factory'), new Reference('twig'),
+                    new Reference('router'), new Reference('security.csrf.token_manager'), $config['preferences']['scopes'], $web['templates']['preferences'],
+                ]);
         }
 
         if ($adminUi) {
@@ -414,7 +452,7 @@ final class NowoNotifyKitExtension extends Extension implements PrependExtension
                     new Reference(NotificationStoreInterface::class), new Reference(Retention::class), new Reference(CurrentRecipient::class),
                     new Reference(OperatorAccessCheckerInterface::class), new Reference('form.factory'), new Reference('twig'), new Reference('router'),
                     new Reference('translator'), interface_exists(MessageBusInterface::class) ? new Reference('messenger.default_bus', ContainerInterface::NULL_ON_INVALID_REFERENCE) : null,
-                    $clock, $logger, '%' . self::REALTIME_MODE . '%', $web['layout_template'],
+                    $clock, $logger, '%' . self::REALTIME_MODE . '%', $web['layout_template'], new Reference(AuditTrailInterface::class),
                 ]);
         }
     }

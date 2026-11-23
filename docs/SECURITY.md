@@ -37,6 +37,35 @@ S2 (access + UI, **immediate REQ-SEC-004 audit before the tag**):
   The bell injects the menu only from a non-redirected `text/html` answer and keeps only its menu element.
 - Not yet: the `limits.ui_writes` rate limit (S4).
 
+S3 (preferences, batched audit before 1.0.0):
+
+- **Own preferences only.** Every preferences endpoint resolves the person from the token storage; no request carries
+  a recipient. `web_ui.security.preferences_roles` (default: `access_roles`) or your
+  `PreferencesAccessCheckerInterface` decides who may open the page (403 otherwise).
+- **Contexts deny by default.** A context switch or override is accepted only for a context
+  `ContextProviderInterface::contextsFor()` lists for the logged-in person, checked again by `PreferencesInterface::save()`
+  and `resetContext()` (without a provider no context can be tuned); the page, the dialog fragment, the autosave and the
+  reset answer 404 for any other context, so another person's project cannot be probed.
+- **Matrix integrity.** Unknown categories and channels, locked cells and scopes the configuration refuses are 422 (JSON)
+  / 403 (form); the autosave body is capped (32 KiB, 100 changes, depth 8).
+- **Races.** Optimistic per-cell expectations: a stale change is refused (409 `CONFLICT_001`) and writes nothing of its
+  save; see [CONCURRENCY.md](CONCURRENCY.md#write-paths).
+- **CSRF** `nowo_notify_kit_preferences` on every POST (header for the autosave, `_token` for forms); 403 otherwise.
+- **Audit (AuditKit bridge).** `notify.preferences_changed` (cell keys, count, reset flag; never the values) and
+  `notify.retention_run` (counts); never notification content or another person.
+- **Dialog.** The script inserts only the `[data-nowo-notify-kit-preferences]` element of a non-redirected `text/html`
+  answer from the bundle's own endpoint; context labels are escaped plain text.
+- **Reviewed `innerHTML` sites (REQ-UX-001 rule 2).** Exactly two, both parsing server HTML of the bundle's own
+  endpoints into a detached `<template>` and keeping only one known element:
+  - `src/Resources/assets/src/bell.ts` `load()`: the menu fragment (`GET …/menu`), kept element
+    `[data-nowo-notify-kit-menu]`;
+  - `src/Resources/assets/src/preferences.ts` `openOverrides()`: the context fragment (`GET …/context?fragment=1`), kept
+    element `[data-nowo-notify-kit-fragment] [data-nowo-notify-kit-preferences]`.
+
+  Both `fetch` same-origin with `redirect: 'error'`, refuse a redirected or non-`text/html` answer, and the templates
+  print every value with autoescape (no `|raw`); titles set by script go through `textContent`.
+- **No host flush.** The AuditKit bridge is wired only when AuditKit writes in `isolated` mode (audit ZAL-1).
+
 ## Threat model
 
 From contract §6. Each threat names the control that answers it and the slice that ships it.
@@ -48,6 +77,8 @@ From contract §6. Each threat names the control that answers it and the slice t
 | Open redirect / injected links | `url` must be a local path (no `//`, no backslash, no control characters, ≤ 500 chars); absolute links from `default_uri` / `links.base_url`, never the request Host | S1, S4 |
 | XSS through params or titles | Titles rendered from translation keys at display time with autoescape; mail templates autoescaped; Slack mrkdwn escaper; push plain text | S2, S4 |
 | CSRF on read / unread / preferences | FormKit forms and the `X-CSRF-TOKEN` header for `fetch` | S2, S3 |
+| Changing another person's preferences, or a context one cannot open | The person from the token storage only; contexts from the provider's list for that person (404 otherwise); checked in the service too | S3 |
+| Lost or crossed preference updates (two tabs, two devices) | One conditional statement per cell with the expectation the page showed; stale → 409, all or nothing | S3 |
 | Realtime leak | Private Mercure updates on an HMAC topic per recipient; payload `{event, unread}` only | S2 |
 | Floods | Recipients per request cap (S1); per-recipient-per-channel limit (overflow to the digest), UI write limit, bounded poll (S2, S4) | S1, S4 |
 | Personal data in events or logs | Events carry ids only, never params, URLs or rendered text | S1 |

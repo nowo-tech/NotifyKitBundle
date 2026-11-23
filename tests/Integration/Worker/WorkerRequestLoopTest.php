@@ -20,6 +20,7 @@ use function explode;
 use function gc_collect_cycles;
 use function intdiv;
 use function json_decode;
+use function json_encode;
 use function memory_get_usage;
 use function min;
 use function str_replace;
@@ -143,10 +144,66 @@ final class WorkerRequestLoopTest extends KernelTestCase
         self::assertLessThan(1024 * 1024, memory_get_usage() - $baseline, 'memory stays flat over ' . self::REQUESTS . ' requests');
     }
 
+    public function testPreferenceSavesOfTwoPeopleNeverLeak(): void
+    {
+        $host   = Host::standard();
+        $base   = $host->configure();
+        $kernel = $this->bootKernel($host->bundleConfig([
+            'recipient' => ['class' => null, 'resolver' => WebRecipientResolver::class],
+            'types'     => ['invitation_accepted' => ['category' => 'account', 'channels' => ['in_app' => true, 'mail' => true]]],
+            'web_ui'    => ['enabled' => true],
+        ]), Host::databaseUrl(), static function (ContainerConfigurator $container, string $url) use ($base): void {
+            $base($container, $url);
+            $container->services()->set(WebRecipientResolver::class);
+        }, true, true);
+        $host->resetSchema($kernel);
+        $http = $kernel->getContainer()->get('http_kernel');
+        self::assertInstanceOf(HttpKernelInterface::class, $http);
+        self::assertInstanceOf(TerminableInterface::class, $http);
+
+        /** @var array<string, array{cookie: string, token: string}> $sessions */
+        $sessions = [];
+        foreach (['a', 'b'] as $user) {
+            $response        = $this->send($http, $user, 'GET', '/account/notifications');
+            $cookie          = explode(';', (string) $response->headers->get('Set-Cookie'))[0];
+            $token           = (string) (new Crawler((string) $response->getContent()))->filter('[data-nowo-notify-kit-preferences]')->attr('data-csrf-token');
+            $sessions[$user] = ['cookie' => $cookie, 'token' => $token];
+        }
+
+        $baseline = 0;
+        $state    = ['a' => ['on' => true, 'token' => '-'], 'b' => ['on' => true, 'token' => '-']];
+        for ($i = 0; $i < self::REQUESTS; ++$i) {
+            $user = $i % 2 === 0 ? 'a' : 'b';
+            if (intdiv($i, 2) % 2 === 0) {
+                $change   = ['context' => '', 'category' => 'account', 'channel' => 'mail', 'enabled' => !$state[$user]['on'], 'scope' => 'all', 'expected' => $state[$user]['token']];
+                $response = $this->send($http, $user, 'POST', '/account/notifications/cells', $sessions[$user]['cookie'], ['X-CSRF-TOKEN' => $sessions[$user]['token'], 'Content-Type' => 'application/json'], json_encode(['changes' => [$change]], JSON_THROW_ON_ERROR));
+                $answer   = json_decode((string) $response->getContent(), true, 8, JSON_THROW_ON_ERROR);
+                self::assertIsArray($answer);
+                self::assertTrue($answer['ok'] ?? false, 'request ' . $i . ': ' . $response->getContent());
+                $state[$user] = ['on' => !$state[$user]['on'], 'token' => $state[$user]['on'] ? '0a' : '-'];
+                self::assertSame($state[$user]['token'], $answer['cells'][0]['token'], 'request ' . $i);
+            } else {
+                $response = $this->send($http, $user, 'GET', '/account/notifications', $sessions[$user]['cookie']);
+                $page     = new Crawler((string) $response->getContent());
+                $cell     = $page->filter('[data-testid="notify-kit-cell-account-mail"]');
+                self::assertSame($state[$user]['on'], $cell->attr('checked') !== null, 'request ' . $i . ' shows only its own preference');
+            }
+            self::assertLessThan(400, $response->getStatusCode(), 'request ' . $i);
+
+            if ($i === 200) {
+                gc_collect_cycles();
+                $baseline = memory_get_usage();
+            }
+        }
+        gc_collect_cycles();
+
+        self::assertLessThan(1024 * 1024, memory_get_usage() - $baseline, 'memory stays flat over ' . self::REQUESTS . ' requests');
+    }
+
     /**
      * @param array<string, string> $headers
      */
-    private function send(HttpKernelInterface&TerminableInterface $http, string $user, string $method, string $uri, ?string $cookie = null, array $headers = []): Response
+    private function send(HttpKernelInterface&TerminableInterface $http, string $user, string $method, string $uri, ?string $cookie = null, array $headers = [], ?string $body = null): Response
     {
         $server = ['REMOTE_ADDR' => '203.0.113.9', 'HTTP_X_TEST_USER' => $user, 'HTTP_X_TEST_ROLES' => 'ROLE_USER'];
         foreach ($headers as $name => $value) {
@@ -155,7 +212,7 @@ final class WorkerRequestLoopTest extends KernelTestCase
         if ($cookie !== null) {
             $server['HTTP_COOKIE'] = $cookie;
         }
-        $request = Request::create($uri, $method, server: $server);
+        $request = Request::create($uri, $method, server: $server, content: $body);
         if ($cookie !== null) {
             [$name, $value] = explode('=', $cookie, 2);
             $request->cookies->set($name, $value);

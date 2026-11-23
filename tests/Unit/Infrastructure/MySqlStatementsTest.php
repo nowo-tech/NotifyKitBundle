@@ -8,16 +8,21 @@ use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Platforms\MySQL84Platform;
 use Doctrine\Persistence\ManagerRegistry;
+use Nowo\NotifyKitBundle\Contract\ChannelPreference;
+use Nowo\NotifyKitBundle\Contract\PreferenceExpectation;
+use Nowo\NotifyKitBundle\Contract\PreferenceKey;
 use Nowo\NotifyKitBundle\Contract\RecipientRef;
+use Nowo\NotifyKitBundle\Domain\CellWrite;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\AfterCommitQueue;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\DbalNotificationStore;
+use Nowo\NotifyKitBundle\Infrastructure\Persistence\DbalPreferenceStore;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\NotifyKitTransactions;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 /**
  * The MySQL statements the coverage job (SQLite) cannot run; the real-database job runs them on MySQL 8.4: the one-
- * statement dedupe claim (audit QL-L1) and the byte comparison before LIMIT (audit QL-M3).
+ * statement dedupe claim (audit QL-L1), the byte comparison before LIMIT (audit QL-M3) and the S3 preference cell writes.
  */
 final class MySqlStatementsTest extends TestCase
 {
@@ -50,6 +55,30 @@ final class MySqlStatementsTest extends TestCase
         self::assertSame([], $store->recipientsOver(2, ['user', 'alice'], 10));
     }
 
+    public function testPreferenceWritesAreOneConditionalStatementWithByteComparison(): void
+    {
+        $connection = $this->connection();
+        $statements = [];
+        $connection->method('executeStatement')->willReturnCallback(static function (string $sql) use (&$statements): int {
+            $statements[] = $sql;
+
+            return 1;
+        });
+        $connection->method('fetchOne')->willReturn(1);
+        $store = new DbalPreferenceStore($this->transactions($connection));
+        $now   = new DateTimeImmutable('2026-11-23 10:00:00');
+        $key   = PreferenceKey::account('issues', 'mail');
+        $alice = new RecipientRef('user', 'alice');
+
+        self::assertSame(CellWrite::Changed, $store->write($alice, $key, PreferenceExpectation::any(), new ChannelPreference(false), $now));
+        self::assertSame(CellWrite::Changed, $store->write($alice, $key, PreferenceExpectation::absent(), new ChannelPreference(false), $now));
+        self::assertSame(CellWrite::Changed, $store->write($alice, $key, PreferenceExpectation::stored(new ChannelPreference(false)), null, $now));
+        self::assertStringContainsString('ON DUPLICATE KEY UPDATE updated_at = IF(', $statements[0]);
+        self::assertStringContainsString('ON DUPLICATE KEY UPDATE id = id', $statements[1]);
+        self::assertStringContainsString('CAST(recipient_id AS BINARY) = CAST(? AS BINARY)', $statements[2]);
+        self::assertStringContainsString('CAST(context_key AS BINARY) = CAST(? AS BINARY)', $statements[2]);
+    }
+
     /**
      * @return Connection&MockObject
      */
@@ -63,11 +92,16 @@ final class MySqlStatementsTest extends TestCase
 
     private function store(Connection $connection): DbalNotificationStore
     {
+        return new DbalNotificationStore($this->transactions($connection));
+    }
+
+    private function transactions(Connection $connection): NotifyKitTransactions
+    {
         $registry = $this->createStub(ManagerRegistry::class);
         $registry->method('getManagerNames')->willReturn([]);
         $registry->method('getConnectionNames')->willReturn(['default' => 'doctrine.dbal.default_connection']);
         $registry->method('getConnection')->willReturn($connection);
 
-        return new DbalNotificationStore(new NotifyKitTransactions($registry, new AfterCommitQueue()));
+        return new NotifyKitTransactions($registry, new AfterCommitQueue());
     }
 }

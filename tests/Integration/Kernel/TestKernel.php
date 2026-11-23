@@ -19,6 +19,7 @@ use Symfony\Bundle\SecurityBundle\SecurityBundle;
 use Symfony\Bundle\TwigBundle\TwigBundle;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
+use Symfony\Component\HttpKernel\Bundle\BundleInterface;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
 use Twig\Extra\TwigExtraBundle\TwigExtraBundle;
@@ -42,6 +43,7 @@ final class TestKernel extends Kernel
      * @param string|null $databaseUrl DBAL URL; null = no DoctrineBundle
      * @param (Closure(ContainerConfigurator, string): void)|null $configure extra host configuration
      * @param (Closure(ContainerBuilder): void)|null $build hook to add compiler passes (inspect the compiled container)
+     * @param list<BundleInterface> $extraBundles further bundles (e.g. AuditKit for the bridge test)
      */
     public function __construct(
         private readonly string $id,
@@ -51,6 +53,7 @@ final class TestKernel extends Kernel
         private readonly bool $notifyRoute = false,
         private readonly ?Closure $build = null,
         private readonly bool $web = false,
+        private readonly array $extraBundles = [],
     ) {
         parent::__construct('test', false);
     }
@@ -68,6 +71,7 @@ final class TestKernel extends Kernel
             yield new NowoUiKitBundle();
             yield new NowoFormKitBundle();
         }
+        yield from $this->extraBundles;
         yield new NowoNotifyKitBundle();
     }
 

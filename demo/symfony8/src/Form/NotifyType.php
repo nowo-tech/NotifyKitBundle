@@ -29,6 +29,7 @@ final class NotifyType extends AbstractType
                 'choices' => [
                     'A personal welcome, to me (from the other person)' => 'welcome',
                     'A project "demo" update by Carol, to Alice and Bob (only Alice may open it)' => 'project',
+                    'A mention of me by the other person (the bell row follows my preferences)' => 'mention',
                 ],
             ]);
         });

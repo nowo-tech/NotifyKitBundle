@@ -220,3 +220,109 @@
         animation: none;
     }
 }
+
+/* Preferences page (S3): the category × channel matrix, the switches and the context dialog. */
+.nowo-notify-kit-prefs__switch {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-block-end: 1rem;
+}
+
+.nowo-notify-kit-prefs__matrix td,
+.nowo-notify-kit-prefs__matrix th[scope="col"] {
+    text-align: center;
+}
+
+.nowo-notify-kit-prefs__matrix th[scope="row"] {
+    text-align: start;
+}
+
+.nowo-notify-kit-prefs__locked {
+    color: var(--nowo-ui-muted, currentColor);
+    font-size: 0.875em;
+}
+
+.nowo-notify-kit-prefs__contexts {
+    margin-block: 1.25rem 0;
+    border: 0;
+    padding: 0;
+}
+
+.nowo-notify-kit-prefs__contexts ul {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.nowo-notify-kit-prefs__contexts li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.nowo-notify-kit-prefs__status {
+    min-block-size: 1.5em;
+    margin-block: 0.75rem 0;
+    color: var(--nowo-ui-muted, currentColor);
+}
+
+.nowo-notify-kit-prefs [aria-busy="true"] {
+    cursor: progress;
+}
+
+.nowo-notify-kit-dialog {
+    inline-size: min(48rem, calc(100vw - 2rem));
+    max-block-size: calc(100dvh - 2rem);
+    border: 1px solid var(--nowo-ui-border, currentColor);
+    border-radius: var(--nowo-ui-radius, 0.5rem);
+    padding: 1rem 1.25rem;
+    background: var(--nowo-ui-surface, Canvas);
+    color: var(--nowo-ui-text, CanvasText);
+}
+
+/* The page behind a modal dialog never scrolls (Modern Web Guidance: both rules are needed). */
+.nowo-notify-kit-dialog:modal {
+    overscroll-behavior: contain;
+}
+
+.nowo-notify-kit-dialog::backdrop {
+    overflow: hidden;
+    overscroll-behavior: contain;
+    background: rgb(0 0 0 / 0.45);
+}
+
+.nowo-notify-kit-dialog__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-block-end: 1rem;
+}
+
+.nowo-notify-kit-dialog__header h1 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.nowo-notify-kit-dialog__close {
+    border: 1px solid var(--nowo-ui-border, currentColor);
+    border-radius: var(--nowo-ui-radius, 0.375rem);
+    padding: 0.25rem 0.75rem;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.nowo-notify-kit-dialog__close:focus-visible {
+    outline: 2px solid var(--nowo-ui-focus-ring-color, currentColor);
+    outline-offset: 1px;
+}
+
+/* The script saves every change at once and hides the save button: [hidden] must win over the theme's display. */
+.nowo-notify-kit-prefs [data-nowo-notify-kit-submit][hidden] {
+    display: none;
+}

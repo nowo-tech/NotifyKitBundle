@@ -1,4 +1,6 @@
 # S2: inbox, header bell (polling every 10 s in the demo) and operator page for the two demo people.
+# S3: preferences page (/account/notifications): a mail column (stored now, delivered from S4), an optional bell for
+# mentions, and one project per person to switch off or customise.
 nowo_notify_kit:
     enabled: true
     recipient:
@@ -8,9 +10,13 @@ nowo_notify_kit:
     categories:
         account: { label: notify.category.account, order: 10 }
         projects: { label: notify.category.projects, order: 20 }
+        mentions: { label: notify.category.mentions, order: 30 }
     types:
-        demo.welcome: { category: account, icon: 'tabler:hand-stop' }
-        demo.project_update: { category: projects, icon: 'tabler:folder', permission: project.view }
+        demo.welcome: { category: account, icon: 'tabler:hand-stop', channels: { in_app: true, mail: true } }
+        demo.project_update: { category: projects, icon: 'tabler:folder', permission: project.view, channels: { in_app: true, mail: false } }
+        demo.mention: { category: mentions, icon: 'tabler:at', in_app_optional: true, channels: { in_app: true, mail: true } }
+    preferences:
+        contexts: { provider: App\Notify\DemoContextProvider }
     realtime:
         mode: poll
         poll_seconds: 10

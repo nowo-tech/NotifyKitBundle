@@ -32,6 +32,16 @@ final class NotifierTest extends TestCase
         self::assertSame(1, $notifier->notify(new NotificationRequest('some.type', [new RecipientRef('user', 'b')], new RecipientRef('user', 'b'), null, 't', '/t'))->skippedActor);
     }
 
+    public function testWithoutPreferencesAnOptionalBellOffByDefaultIsSkipped(): void
+    {
+        $transactions = $this->transactions();
+        $types        = TypeRegistry::create(['quiet.notice' => ['category' => 'general', 'icon' => null, 'title_key' => null, 'permission' => null, 'channels' => ['in_app' => false], 'in_app_optional' => true, 'locked_channels' => [], 'urgency' => 'normal', 'coalesce' => true, 'in_matrix' => true]], [], [], false, null);
+        $notifier     = new Notifier(new DbalNotificationStore($transactions), $transactions, $types, new PersonalOnlyAccessChecker());
+
+        $result = $notifier->notify(new NotificationRequest('quiet.notice', [new RecipientRef('user', 'a')], null, null, 't', '/t'));
+        self::assertSame([0, 1], [$result->written, $result->skippedPreference]);
+    }
+
     private function transactions(): NotifyKitTransactions
     {
         $connection = Sqlite::connection();
