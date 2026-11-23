@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Nowo\NotifyKitBundle\Presentation\View;
 
 use Nowo\NotifyKitBundle\Domain\InboxStatistics;
-use Nowo\NotifyKitBundle\NowoNotifyKitBundle;
+use Nowo\NotifyKitBundle\Presentation\TranslationDomain;
 use Nowo\UiKitBundle\View\Action;
 use Nowo\UiKitBundle\View\Column;
 use Nowo\UiKitBundle\View\DetailItem;
@@ -30,7 +30,7 @@ use function assert;
 final readonly class InboxPages
 {
     /** Translation domain of every label. */
-    public const DOMAIN = NowoNotifyKitBundle::TRANSLATION_DOMAIN;
+    public const DOMAIN = TranslationDomain::NAME;
 
     /** Bundle name for per-bundle theme exceptions (`nowo_ui_kit.theme.bundles.NowoNotifyKitBundle`). */
     public const BUNDLE = 'NowoNotifyKitBundle';

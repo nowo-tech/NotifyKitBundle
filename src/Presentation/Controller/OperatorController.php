@@ -11,11 +11,11 @@ use Nowo\NotifyKitBundle\Application\Retention\Retention;
 use Nowo\NotifyKitBundle\Contract\Message\PruneNotificationsMessage;
 use Nowo\NotifyKitBundle\Contract\Security\OperatorAccessCheckerInterface;
 use Nowo\NotifyKitBundle\Domain\NotificationStoreInterface;
-use Nowo\NotifyKitBundle\NowoNotifyKitBundle;
 use Nowo\NotifyKitBundle\Presentation\Form\ActionType;
 use Nowo\NotifyKitBundle\Presentation\Http\Conflicts;
 use Nowo\NotifyKitBundle\Presentation\Http\CurrentRecipient;
 use Nowo\NotifyKitBundle\Presentation\Http\Responses;
+use Nowo\NotifyKitBundle\Presentation\TranslationDomain;
 use Nowo\NotifyKitBundle\Presentation\View\InboxPages;
 use Nowo\TransactionContract\TransientStorageFailure;
 use Psr\Clock\ClockInterface;
@@ -138,7 +138,7 @@ final readonly class OperatorController
         $session = $request->hasSession() ? $request->getSession() : null;
         if ($session instanceof FlashBagAwareSessionInterface) {
             $key = $report->remainder instanceof PruneNotificationsMessage ? $queued ? 'notify.operator.retention_queued' : 'notify.operator.retention_partial' : ('notify.operator.retention_done');
-            $session->getFlashBag()->add('success', $this->translator->trans($key, ['%read%' => $report->read, '%trimmed%' => $report->trimmed, '%dedupe%' => $report->dedupe], NowoNotifyKitBundle::TRANSLATION_DOMAIN));
+            $session->getFlashBag()->add('success', $this->translator->trans($key, ['%read%' => $report->read, '%trimmed%' => $report->trimmed, '%dedupe%' => $report->dedupe], TranslationDomain::NAME));
         }
 
         return new RedirectResponse(Responses::redirectTarget($request, $this->router->generate('nowo_notify_kit_operator')));

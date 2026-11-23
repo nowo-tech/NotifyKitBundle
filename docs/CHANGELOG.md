@@ -16,6 +16,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Internal
+
+- **Deptrac layer check** (REQ-ARCH-002): `deptrac.yaml` with a strict ruleset (Domain / Application framework-free,
+  no skipped violations, uncovered dependencies and unassigned classes fail), `composer deptrac`, `make deptrac`, part
+  of `make release-check` and of the CI PHPStan job. See [ARCHITECTURE.md](ARCHITECTURE.md#architecture-checks).
+- Fixes from the first run, behaviour unchanged: `Notifier` mints row ids through the new
+  `Domain\NotificationIdGeneratorInterface` (the container wires the symfony/uid adapter
+  `Infrastructure\Identity\UuidV7NotificationIdGenerator`; a hand-built `Notifier` without the new optional last
+  argument falls back to a plain-PHP UUIDv7); the bell renderer takes the new
+  `Application\Realtime\RealtimeSubscriptionInterface` (implemented by `MercureSubscription`); the UI layer reads
+  the translation domain from `Presentation\TranslationDomain::NAME` (`NowoNotifyKitBundle::TRANSLATION_DOMAIN`
+  keeps the same value).
+
 ## [0.4.0] - 2026-11-23
 
 ### Added

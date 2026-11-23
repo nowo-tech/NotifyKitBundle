@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Nowo\NotifyKitBundle\Presentation\View;
 
 use DateTimeImmutable;
-use Nowo\NotifyKitBundle\NowoNotifyKitBundle;
+use Nowo\NotifyKitBundle\Presentation\TranslationDomain;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 use function intdiv;
@@ -43,6 +43,6 @@ final readonly class RelativeTime
             return $at->format('Y-m-d');
         }
 
-        return $this->translator->trans($key, ['%count%' => $count], NowoNotifyKitBundle::TRANSLATION_DOMAIN, $locale);
+        return $this->translator->trans($key, ['%count%' => $count], TranslationDomain::NAME, $locale);
     }
 }

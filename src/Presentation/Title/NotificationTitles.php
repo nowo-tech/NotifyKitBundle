@@ -11,7 +11,7 @@ use Nowo\NotifyKitBundle\Contract\NotificationView;
 use Nowo\NotifyKitBundle\Contract\RecipientDirectoryInterface;
 use Nowo\NotifyKitBundle\Contract\RecipientRef;
 use Nowo\NotifyKitBundle\Contract\TypeRegistryInterface;
-use Nowo\NotifyKitBundle\NowoNotifyKitBundle;
+use Nowo\NotifyKitBundle\Presentation\TranslationDomain;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 use function preg_replace;
@@ -29,7 +29,7 @@ use function preg_replace;
  */
 final readonly class NotificationTitles
 {
-    private const DOMAIN = NowoNotifyKitBundle::TRANSLATION_DOMAIN;
+    private const DOMAIN = TranslationDomain::NAME;
 
     /**
      * Holds the collaborators (stateless).

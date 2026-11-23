@@ -71,6 +71,7 @@
         "twig/twig": "^3.8"
     },
     "require-dev": {
+        "deptrac/deptrac": "^4.7.2",
         "doctrine/doctrine-bundle": "^2.13 || ^3.0",
         "friendsofphp/php-cs-fixer": "^3.0",
         "igor-php/igor-php": "^0.10.1 || ^0.11.0",
@@ -180,7 +181,11 @@
             "@cs-check",
             "@test"
         ],
-        "igor": "igor-php --no-agent ."
+        "igor": "igor-php --no-agent .",
+        "deptrac": [
+            "deptrac analyse --no-progress --fail-on-uncovered --report-uncovered",
+            "deptrac debug:unassigned"
+        ]
     },
     "scripts-descriptions": {
         "test": "Run PHPUnit tests",
@@ -195,6 +200,7 @@
         "update": "Update composer.lock (composer update)",
         "validate": "Validate composer.json (composer validate --strict)",
         "qa": "Run all quality assurance checks",
-        "igor": "Run Igor FrankenPHP worker-state audit (REQ-CS-008)"
+        "igor": "Run Igor FrankenPHP worker-state audit (REQ-CS-008)",
+        "deptrac": "Check the layer dependencies of src/ with Deptrac; fail on violations, uncovered dependencies and unassigned classes (REQ-ARCH-002)"
     }
 }

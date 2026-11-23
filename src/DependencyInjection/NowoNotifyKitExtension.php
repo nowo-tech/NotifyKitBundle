@@ -32,11 +32,13 @@ use Nowo\NotifyKitBundle\Contract\Security\OperatorAccessCheckerInterface;
 use Nowo\NotifyKitBundle\Contract\Security\PreferencesAccessCheckerInterface;
 use Nowo\NotifyKitBundle\Contract\TypeProviderInterface;
 use Nowo\NotifyKitBundle\Contract\TypeRegistryInterface;
+use Nowo\NotifyKitBundle\Domain\NotificationIdGeneratorInterface;
 use Nowo\NotifyKitBundle\Domain\NotificationStoreInterface;
 use Nowo\NotifyKitBundle\Domain\PreferenceStoreInterface;
 use Nowo\NotifyKitBundle\Infrastructure\Console\PruneNotificationsCommand;
 use Nowo\NotifyKitBundle\Infrastructure\Console\SchemaCheckCommand;
 use Nowo\NotifyKitBundle\Infrastructure\Doctrine\NotifyKitMetadataListener;
+use Nowo\NotifyKitBundle\Infrastructure\Identity\UuidV7NotificationIdGenerator;
 use Nowo\NotifyKitBundle\Infrastructure\Messenger\PruneNotificationsHandler;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\AfterCommitMiddleware;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\AfterCommitQueue;
@@ -289,11 +291,13 @@ final class NowoNotifyKitExtension extends Extension implements PrependExtension
             new Reference('event_dispatcher', ContainerInterface::IGNORE_ON_INVALID_REFERENCE), $clock, $config['preferences']['scopes'],
         ]);
         $container->setAlias(PreferencesInterface::class, Preferences::class)->setPublic(true);
+        $container->register(UuidV7NotificationIdGenerator::class, UuidV7NotificationIdGenerator::class);
+        $container->setAlias(NotificationIdGeneratorInterface::class, UuidV7NotificationIdGenerator::class);
         $container->register(Notifier::class, Notifier::class)->setArguments([
             $store, $transactions, new Reference(TypeRegistryInterface::class), new Reference(RecipientAccessCheckerInterface::class),
             new Reference('event_dispatcher', ContainerInterface::IGNORE_ON_INVALID_REFERENCE),
             $config['inbox']['repeat_window_seconds'], $config['fan_out']['max_recipients'], $clock, $logger,
-            new Reference(UnreadBadge::class), new Reference(Preferences::class),
+            new Reference(UnreadBadge::class), new Reference(Preferences::class), new Reference(NotificationIdGeneratorInterface::class),
         ]);
         $container->setAlias(NotifierInterface::class, Notifier::class)->setPublic(true);
         $container->register(Inbox::class, Inbox::class)->setArguments([

@@ -11,6 +11,7 @@ use Nowo\NotifyKitBundle\DependencyInjection\Compiler\RequireDoctrinePass;
 use Nowo\NotifyKitBundle\DependencyInjection\Compiler\TwigPathsPass;
 use Nowo\NotifyKitBundle\DependencyInjection\Compiler\WebUiPass;
 use Nowo\NotifyKitBundle\DependencyInjection\NowoNotifyKitExtension;
+use Nowo\NotifyKitBundle\Presentation\TranslationDomain;
 use Symfony\Component\DependencyInjection\Compiler\PassConfig;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
@@ -32,7 +33,7 @@ use Symfony\Component\HttpKernel\Bundle\Bundle;
 final class NowoNotifyKitBundle extends Bundle
 {
     /** Translation domain of the bundle UI copy (REQ-I18N-003) and Twig namespace (REQ-TWIG-002). */
-    public const TRANSLATION_DOMAIN = 'NowoNotifyKitBundle';
+    public const TRANSLATION_DOMAIN = TranslationDomain::NAME;
 
     /**
      * Adds the compiler passes: DoctrineBundle required, the after-commit middleware on the bundle connection only,

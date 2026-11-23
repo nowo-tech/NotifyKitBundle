@@ -27,6 +27,7 @@
 .phpstan.result.cache
 .eslintcache
 /.twig-cs-fixer.cache
+/.deptrac.cache
 
 # Archives / compressed
 *.zip

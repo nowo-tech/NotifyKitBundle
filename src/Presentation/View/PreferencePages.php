@@ -10,7 +10,7 @@ use Nowo\NotifyKitBundle\Contract\PreferenceKey;
 use Nowo\NotifyKitBundle\Contract\PreferenceMatrix;
 use Nowo\NotifyKitBundle\Contract\Scope;
 use Nowo\NotifyKitBundle\Contract\TypeRegistryInterface;
-use Nowo\NotifyKitBundle\NowoNotifyKitBundle;
+use Nowo\NotifyKitBundle\Presentation\TranslationDomain;
 use Nowo\UiKitBundle\View\Action;
 use Nowo\UiKitBundle\View\Label;
 use Nowo\UiKitBundle\View\PageHeader;
@@ -30,7 +30,7 @@ use function count;
 final readonly class PreferencePages
 {
     /** Translation domain of every label. */
-    public const DOMAIN = NowoNotifyKitBundle::TRANSLATION_DOMAIN;
+    public const DOMAIN = TranslationDomain::NAME;
 
     /**
      * @param list<string> $scopes `preferences.scopes`

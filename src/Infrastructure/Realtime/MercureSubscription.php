@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\NotifyKitBundle\Infrastructure\Realtime;
 
+use Nowo\NotifyKitBundle\Application\Realtime\RealtimeSubscriptionInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpFoundation\Request;
@@ -24,7 +25,7 @@ use Throwable;
  *
  * Stateless (worker mode): the request comes from the stack per call.
  */
-final readonly class MercureSubscription
+final readonly class MercureSubscription implements RealtimeSubscriptionInterface
 {
     /**
      * Holds the collaborators (stateless).

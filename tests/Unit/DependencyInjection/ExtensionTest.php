@@ -10,6 +10,8 @@ use Nowo\NotifyKitBundle\Contract\NotifierInterface;
 use Nowo\NotifyKitBundle\Contract\RecipientResolverInterface;
 use Nowo\NotifyKitBundle\DependencyInjection\Compiler\RequireDoctrinePass;
 use Nowo\NotifyKitBundle\DependencyInjection\NowoNotifyKitExtension;
+use Nowo\NotifyKitBundle\Domain\NotificationIdGeneratorInterface;
+use Nowo\NotifyKitBundle\Infrastructure\Identity\UuidV7NotificationIdGenerator;
 use Nowo\NotifyKitBundle\Infrastructure\Messenger\PruneNotificationsHandler;
 use Nowo\NotifyKitBundle\Infrastructure\Recipient\DoctrineRecipientResolver;
 use Nowo\NotifyKitBundle\Presentation\Routing\NotifyKitRouteLoader;
@@ -54,6 +56,7 @@ final class ExtensionTest extends TestCase
         self::assertSame('app_', $container->getParameter('nowo_notify_kit.table_prefix'));
         self::assertTrue($container->hasDefinition(Notifier::class));
         self::assertSame(Notifier::class, (string) $container->getAlias(NotifierInterface::class));
+        self::assertSame(UuidV7NotificationIdGenerator::class, (string) $container->getAlias(NotificationIdGeneratorInterface::class), 'new rows get symfony/uid UUIDv7 ids (REQ-ARCH-002 port)');
         self::assertSame(DoctrineRecipientResolver::class, (string) $container->getAlias(RecipientResolverInterface::class));
         self::assertTrue($container->hasDefinition(PruneNotificationsHandler::class));
         $runner = $container->getDefinition(NowoNotifyKitExtension::TRANSACTIONS)->getArgument(3);
