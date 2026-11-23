@@ -21,6 +21,7 @@ use Nowo\NotifyKitBundle\Contract\PreferenceExpectation;
 use Nowo\NotifyKitBundle\Contract\PreferenceKey;
 use Nowo\NotifyKitBundle\Contract\RecipientRef;
 use Nowo\NotifyKitBundle\Contract\Scope;
+use Nowo\NotifyKitBundle\Contract\TypeDefinition;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\AfterCommitQueue;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\DbalNotificationStore;
 use Nowo\NotifyKitBundle\Infrastructure\Persistence\DbalPreferenceStore;
@@ -182,6 +183,12 @@ final class PreferencesTest extends TestCase
 
         $this->expectException(InvalidNotificationArgumentException::class);
         $notifier->notify(new NotificationRequest('mention.added', [$this->alice], null, null, 't7', '/t', involved: [$bob, $bob, $bob, $bob]));
+    }
+
+    public function testTheGateKeepsTheBellOfAProviderTypeWithoutAnInAppDefault(): void
+    {
+        $provider = new TypeDefinition('provider.type', 'outside', 'tabler:bell', 'k', null, [], []);
+        self::assertSame(['user:alice' => true], $this->preferences()->lets($provider, 'in_app', [$this->alice], null, []), 'ZAL-2');
     }
 
     public function testTheGateLetsEveryoneThroughForALockedChannel(): void

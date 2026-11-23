@@ -273,7 +273,10 @@ nowo_notify_kit:
 
 **What S3 changes in `notify()`.** The in-app row of a type with `in_app_optional: true` now follows the person's
 preferences (one query for all recipients; `NotifyResult::$skippedPreference`, `NotificationSkippedEvent` with reason
-`preference`). A type whose bell row is locked (the default) reads nothing and behaves as before. The other channels
+`preference`). A type whose bell row is locked (the default) reads nothing and behaves as before. With nothing stored,
+a type gets **its category's default** (on when one of the category's types is on by default, `in_app` on unless a type
+turns it off): exactly what the page shows, so what a person sees is what is delivered. Keep types whose defaults must
+differ in separate categories. The other channels
 (`mail`, `push`, `slack`) are delivered from S4; their preferences can be stored and read now, so a host may already
 use them for its own alerts (`PreferenceMatrix::resolveType()`). `NotificationRequest::$involved` is capped at
 `fan_out.max_recipients` (audit QL-I3).
@@ -340,21 +343,24 @@ values). Concurrency: [CONCURRENCY.md](CONCURRENCY.md#write-paths).
 
 ### Audit trail (AuditKit)
 
-With nowo-tech/audit-kit-bundle and its action log on (`nowo_audit_kit.action_log.entity_class`), `bridges.audit_kit:
-auto` records:
+With nowo-tech/audit-kit-bundle 2.x, its action log on (`nowo_audit_kit.action_log.entity_class`) **and**
+`nowo_audit_kit.action_log.flush_mode: isolated` (the 2.x default), `bridges.audit_kit: auto` records:
 
 | Action | Actor / subject | Context |
 | --- | --- | --- |
 | `notify.preferences_changed` | the person / the person (recipient id) | `recipient_type`, `changed` (at most 50 cell keys such as `account/issues/mail`, `project:42/*/*`), `count`, `reset` |
 | `notify.retention_run` | the operator's recipient id (null when the operator has none) | `read`, `trimmed`, `dedupe`, `complete` (counts) |
 
-Rows go through `recordIdsAndFlush()` after the bundle's commit (AuditKit 2.x default `flush_mode: isolated` writes
-only the new row; with `flush_mode: host` AuditKit flushes your entity manager there). A failure is logged and never
-undoes the change. No notification content, value or other person is ever written.
+Rows go through `recordIdsAndFlush()` after the bundle's commit. In `isolated` mode AuditKit writes only the new row
+through its own short-lived entity manager: **the bundle never flushes your entity manager**, so your pending changes stay
+pending (REQ-ARCH-001 rule 6). With `flush_mode: host` AuditKit would flush your entity manager with every pending change,
+so the bridge is not wired: `auto` leaves it off (with a line in the container build log), `true` refuses to build.
+AuditKit < 2.0 is a conflict of the package. A failure of the audit write is logged and never undoes the change, nor
+turns *Run retention now* into an error. No notification content, value or other person is ever written.
 
 ## Browser console
 
-The preferences script logs one line when it loads (REQ-ASSETS-005; the bell script joins with its next change), e.g.
+Each bundle script logs one line when it loads (REQ-ASSETS-005): `📦 [notify-kit/bell] script loaded, build: …` and
 `📦 [notify-kit/preferences] script loaded, build: 2026-11-23 14:05 UTC` (the build is the committed
 `build-info.json` `builtAt`). Turn it off with `<html data-nowo-console="quiet">` or `globalThis.NOWO_CONSOLE =
 'quiet'` before the script runs. Nothing else is printed.

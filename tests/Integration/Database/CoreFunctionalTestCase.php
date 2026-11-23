@@ -324,7 +324,8 @@ abstract class CoreFunctionalTestCase extends KernelTestCase
 
     public function testATypeWhoseBellIsOffWritesNothing(): void
     {
-        $this->boot(['types' => ['quiet.notice' => ['category' => 'account', 'in_app_optional' => true, 'channels' => ['in_app' => false]]]]);
+        // In its own category: a category has one default per channel (audit ZAL-3), and `account` has the bell on.
+        $this->boot(['types' => ['quiet.notice' => ['category' => 'quiet', 'in_app_optional' => true, 'channels' => ['in_app' => false]]]]);
 
         $result = $this->notifier()->notify(new NotificationRequest('quiet.notice', [$this->r('a')], null, null, 'q', '/q'));
         self::assertSame(0, $result->written);

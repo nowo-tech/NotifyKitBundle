@@ -64,6 +64,7 @@ final class MySqlStatementsTest extends TestCase
 
             return 1;
         });
+        $connection->method('fetchOne')->willReturn(1);
         $store = new DbalPreferenceStore($this->transactions($connection));
         $now   = new DateTimeImmutable('2026-11-23 10:00:00');
         $key   = PreferenceKey::account('issues', 'mail');

@@ -100,6 +100,7 @@
         "symfony/security-bundle": "The inbox page, bell and operator page (web_ui / admin_ui) need a firewall and a logged-in user"
     },
     "conflict": {
+        "nowo-tech/audit-kit-bundle": "<2.0",
         "symfony/mercure": "<0.10"
     },
     "autoload": {

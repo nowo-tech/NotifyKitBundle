@@ -321,8 +321,7 @@ final readonly class PreferencesController
                 if ($checked === $shown || !$field instanceof GridSwitch) {
                     continue;
                 }
-                $switchContext = $field->contextKey === '' ? null : $this->find($this->contexts->contextsFor($recipient), $field->contextKey)?->ref;
-                $key           = PreferenceKey::of($switchContext, PreferenceKey::ANY, PreferenceKey::ANY);
+                $key = $field->contextKey === '' ? PreferenceKey::account(PreferenceKey::ANY, PreferenceKey::ANY) : $this->contextSwitch($recipient, $field->contextKey);
             }
             try {
                 $changes[] = new PreferenceChange($key, $checked, $scope, PreferenceExpectation::fromToken(is_string($token) ? $token : ''));
@@ -343,6 +342,20 @@ final readonly class PreferencesController
         }
 
         return new RedirectResponse($back . (str_contains($back, '?') ? '&' : '?') . 'saved=1');
+    }
+
+    /**
+     * The switch cell of a context of the no-JS form: the context must still be listed for the person, otherwise 404
+     * (audit ZAL-4: never the account master switch instead).
+     */
+    private function contextSwitch(RecipientRef $recipient, string $contextKey): PreferenceKey
+    {
+        $choice = $this->find($this->contexts->contextsFor($recipient), $contextKey);
+        if (!$choice instanceof ContextChoice) {
+            throw new NotFoundHttpException('Context not found.');
+        }
+
+        return PreferenceKey::forContext($choice->ref, PreferenceKey::ANY, PreferenceKey::ANY);
     }
 
     /**

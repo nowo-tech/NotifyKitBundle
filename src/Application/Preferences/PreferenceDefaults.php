@@ -53,7 +53,7 @@ final readonly class PreferenceDefaults
                 continue;
             }
             foreach ($channels as $channel) {
-                $defaults[$type->category][$channel] = ($defaults[$type->category][$channel] ?? false) || ($type->defaultChannels[$channel] ?? false);
+                $defaults[$type->category][$channel] = ($defaults[$type->category][$channel] ?? false) || $type->isDefaultOn($channel);
                 $locked                              = in_array($channel, $type->lockedChannels, true);
                 $lockedBy[$type->category][$channel] = ($lockedBy[$type->category][$channel] ?? true) && $locked;
             }

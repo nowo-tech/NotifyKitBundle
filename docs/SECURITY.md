@@ -55,6 +55,16 @@ S3 (preferences, batched audit before 1.0.0):
   `notify.retention_run` (counts); never notification content or another person.
 - **Dialog.** The script inserts only the `[data-nowo-notify-kit-preferences]` element of a non-redirected `text/html`
   answer from the bundle's own endpoint; context labels are escaped plain text.
+- **Reviewed `innerHTML` sites (REQ-UX-001 rule 2).** Exactly two, both parsing server HTML of the bundle's own
+  endpoints into a detached `<template>` and keeping only one known element:
+  - `src/Resources/assets/src/bell.ts` `load()`: the menu fragment (`GET …/menu`), kept element
+    `[data-nowo-notify-kit-menu]`;
+  - `src/Resources/assets/src/preferences.ts` `openOverrides()`: the context fragment (`GET …/context?fragment=1`), kept
+    element `[data-nowo-notify-kit-fragment] [data-nowo-notify-kit-preferences]`.
+
+  Both `fetch` same-origin with `redirect: 'error'`, refuse a redirected or non-`text/html` answer, and the templates
+  print every value with autoescape (no `|raw`); titles set by script go through `textContent`.
+- **No host flush.** The AuditKit bridge is wired only when AuditKit writes in `isolated` mode (audit ZAL-1).
 
 ## Threat model
 

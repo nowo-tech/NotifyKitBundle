@@ -32,6 +32,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Contracts\Translation\TranslatorInterface;
+use Throwable;
 use Twig\Environment;
 
 use function sprintf;
@@ -123,12 +124,17 @@ final readonly class OperatorController
             'dedupe'   => $report->dedupe,
             'complete' => !$report->remainder instanceof PruneNotificationsMessage,
         ]);
-        $this->audit?->record(AuditTrailInterface::RETENTION_RUN, $user === null ? null : $this->current->recipientOf($user), [
-            'read'     => $report->read,
-            'trimmed'  => $report->trimmed,
-            'dedupe'   => $report->dedupe,
-            'complete' => !$report->remainder instanceof PruneNotificationsMessage,
-        ]);
+        try {
+            $this->audit?->record(AuditTrailInterface::RETENTION_RUN, $user === null ? null : $this->current->recipientOf($user), [
+                'read'     => $report->read,
+                'trimmed'  => $report->trimmed,
+                'dedupe'   => $report->dedupe,
+                'complete' => !$report->remainder instanceof PruneNotificationsMessage,
+            ]);
+        } catch (Throwable $exception) {
+            // The retention work is committed: a failing audit trail is logged, never answered as an error (ZAL-I2).
+            ($this->logger ?? new NullLogger())->error('nowo_notify_kit: the audit trail could not record the retention run: {class}', ['class' => $exception::class, 'exception' => $exception]);
+        }
         $session = $request->hasSession() ? $request->getSession() : null;
         if ($session instanceof FlashBagAwareSessionInterface) {
             $key = $report->remainder instanceof PruneNotificationsMessage ? $queued ? 'notify.operator.retention_queued' : 'notify.operator.retention_partial' : ('notify.operator.retention_done');

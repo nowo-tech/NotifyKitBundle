@@ -39,7 +39,7 @@ use function sprintf;
  * | --- | --- | --- |
  * | any → row | `INSERT … ON DUPLICATE KEY UPDATE` / `ON CONFLICT DO UPDATE … WHERE` (an upsert) | never |
  * | any → none | `DELETE` by key | never |
- * | none → row | `INSERT … ON DUPLICATE KEY UPDATE id = id` / `ON CONFLICT DO NOTHING` | 0 rows: a row exists |
+ * | none → row | `INSERT … ON DUPLICATE KEY UPDATE id = id` / `ON CONFLICT DO NOTHING`, then the new id read back | the new id is not there: a row exists |
  * | row → row' | `UPDATE … WHERE key AND enabled = ? AND scope = ?` | 0 rows: the row changed or is gone |
  * | row → none | `DELETE … WHERE key AND enabled = ? AND scope = ?` | 0 rows |
  * | x → x | plain read of the cell | it no longer holds x |
@@ -152,7 +152,7 @@ final readonly class DbalPreferenceStore implements PreferenceStoreInterface
         }
         if (!$old instanceof ChannelPreference) {
             // Insert only when the cell has no row (the unique key decides; no locking read, no gap lock held by a read).
-            return $this->insertIfAbsent($connection, $recipient, $key, $next, $at) === 1 ? CellWrite::Changed : CellWrite::Conflict;
+            return $this->insertIfAbsent($connection, $recipient, $key, $next, $at) ? CellWrite::Changed : CellWrite::Conflict;
         }
         $guard  = $where . ' AND enabled = ? AND COALESCE(scope, ?) = ?';
         $params = [...$values, $old->enabled, Scope::All->value, $old->scope->value];
@@ -210,7 +210,8 @@ final readonly class DbalPreferenceStore implements PreferenceStoreInterface
     {
         [$columns, $marks, $values, $types] = $this->insertParts($recipient, $key, $next, $at);
         if ($connection->getDatabasePlatform() instanceof AbstractMySQLPlatform) {
-            // 1 = inserted, 2 = updated, 0 = the row already held these values.
+            // 1 = inserted, 2 = updated, 0 = the row already held these values (with CLIENT_FOUND_ROWS an unchanged row
+            // also counts 1: the cell is then reported as changed once more, which only adds an event, never loses one).
             return (int) $connection->executeStatement(
                 sprintf('INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE updated_at = IF(enabled <=> VALUES(enabled) AND COALESCE(scope, \'all\') = VALUES(scope), updated_at, VALUES(updated_at)), enabled = VALUES(enabled), scope = VALUES(scope)', $this->table, $columns, $marks),
                 $values,
@@ -225,15 +226,20 @@ final readonly class DbalPreferenceStore implements PreferenceStoreInterface
         );
     }
 
-    private function insertIfAbsent(Connection $connection, RecipientRef $recipient, PreferenceKey $key, ChannelPreference $next, string $at): int
+    /**
+     * Inserts the cell unless a row holds its key, and tells whether **this** row was inserted. The answer is read back
+     * by the generated id, never taken from the affected-row count: with `CLIENT_FOUND_ROWS` (`PDO::MYSQL_ATTR_FOUND_ROWS`)
+     * MySQL reports a duplicate's `id = id` as one row (audit ZAL-I1).
+     */
+    private function insertIfAbsent(Connection $connection, RecipientRef $recipient, PreferenceKey $key, ChannelPreference $next, string $at): bool
     {
         [$columns, $marks, $values, $types] = $this->insertParts($recipient, $key, $next, $at);
         $sql                                = $connection->getDatabasePlatform() instanceof AbstractMySQLPlatform
-            // 1 = inserted; 0 = a row holds the key (`id = id` changes nothing).
             ? 'INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE id = id'
             : 'INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (recipient_type, recipient_id, context_key, category, channel) DO NOTHING';
+        $connection->executeStatement(sprintf($sql, $this->table, $columns, $marks), $values, $types);
 
-        return (int) $connection->executeStatement(sprintf($sql, $this->table, $columns, $marks), $values, $types);
+        return (int) $connection->fetchOne(sprintf('SELECT COUNT(*) FROM %s WHERE id = ?', $this->table), [$values[0]]) === 1;
     }
 
     /**

@@ -25,9 +25,12 @@ php bin/console assets:install                  # js/nowo-notify-kit-preferences
   [INSTALLATION.md](INSTALLATION.md)). Create it with your migrations (`doctrine:migrations:diff` picks it up from the
   bundle mapping) before you deploy. Until it exists, `notify()` of a type with `in_app_optional: true` and the
   preferences page fail; nothing else reads it.
-- **`notify()`**: a type with `in_app_optional: true` now follows each person's preferences for its bell row (with no
-  stored preference the result is the same as before). Types with the default locked bell row are unchanged and read
-  nothing new.
+- **`notify()`**: a type with `in_app_optional: true` now follows each person's preferences for its bell row. Types
+  with the default locked bell row are unchanged and read nothing new. With no stored preference an optional bell row is
+  written as before **unless** the type turns `in_app` off by default **and** shares its category with a type that has
+  it on: a category has one default per channel (on when one of its types is on), the value the preferences page shows,
+  so such a type now writes the bell row too. Move it to its own category to keep it off. A type that does not name
+  `in_app` in its default channels (tagged providers too) keeps the bell on, as in 0.3.
 - **`NotificationRequest::$involved`** above `fan_out.max_recipients` (default 1,000) is now refused with
   `InvalidNotificationArgumentException` (audit QL-I3).
 - **The page** (`web_ui.enabled`): `GET/POST {web_ui.preferences_path}` (default `/account/notifications`) plus
@@ -35,8 +38,10 @@ php bin/console assets:install                  # js/nowo-notify-kit-preferences
   path; `web_ui.security.preferences_roles` (default: `access_roles`) and `preferences_access_checker` set who may open
   it. Per-context switches need `preferences.contexts.provider`: only the contexts it lists for the person can be
   tuned.
-- **AuditKit**: with nowo-tech/audit-kit-bundle's action log on, `bridges.audit_kit: auto` (default) starts recording
-  `notify.preferences_changed` and `notify.retention_run`. Set it to `false` to keep them out.
+- **AuditKit**: the package now conflicts with nowo-tech/audit-kit-bundle < 2.0. With its action log on **and**
+  `nowo_audit_kit.action_log.flush_mode: isolated` (the 2.x default), `bridges.audit_kit: auto` (default) starts
+  recording `notify.preferences_changed` and `notify.retention_run`. In `host` mode the bridge stays off (`auto`) or the
+  container refuses to build (`true`): the bundle never flushes your entity manager. Set it to `false` to keep them out.
 - **Internal**: the application services take `Application\UnitOfWorkInterface` (audit QL-I6); the after-commit DBAL
   middleware now wraps only the bundle connection (audit QL-I7). A host that constructed `Notifier`, `Inbox` or
   `Retention` by hand keeps working (`NotifyKitTransactions` implements the port).

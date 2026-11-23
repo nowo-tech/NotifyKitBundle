@@ -63,7 +63,8 @@ Asset package `nowo_notify_kit` (`/bundles/nowonotifykit`, `assets:install`):
 - `css/nowo-notify-kit.css`: bell, menu and inbox styles on UiKit tokens; logical properties (RTL); dark mode through
   the tokens; `prefers-reduced-motion` respected. Plain CSS, no build step.
 - `js/nowo-notify-kit-bell.js`: the bell script (IIFE built from `src/Resources/assets/src/*.ts` with `pnpm run build`;
-  Vitest ≥ 90 % coverage). It binds every `[data-nowo-notify-kit-bell]`.
+  Vitest ≥ 90 % coverage). It binds every `[data-nowo-notify-kit-bell]` and logs
+  `📦 [notify-kit/bell] script loaded, build: <builtAt>` once (REQ-ASSETS-005, quiet switch as below).
 - `js/nowo-notify-kit-preferences.js` (S3): autosave of the preferences grid and the context dialog (IIFE built from
   `preferences-iife.ts` with `pnpm run build`, which builds both scripts; Vitest ≥ 90 %). It binds every
   `[data-nowo-notify-kit-preferences]` and logs `📦 [notify-kit/preferences] script loaded, build: <builtAt>` once

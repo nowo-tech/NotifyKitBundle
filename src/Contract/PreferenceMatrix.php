@@ -18,7 +18,8 @@ use function in_array;
  * 3. the context switch (`<context>`, `*`, `*`) turned off → off;
  * 4. the context × category override (`<context>`, `<category>`, `<channel>`, else `<channel>` `*`);
  * 5. the account × category row (`''`, `<category>`, `<channel>`, else `*`);
- * 6. the default: the type's default channel (the category's default for the page: on when one of its types is).
+ * 6. the default: the category's default (on when one of its types is on by default) for a type shown in the matrix,
+ *    the same value the page shows; the type's own default otherwise (`in_app` on unless the type turns it off).
  *
  * Immutable, built per call (worker mode).
  */
@@ -159,7 +160,21 @@ final readonly class PreferenceMatrix
             return new ChannelPreference(false);
         }
 
-        return $this->stack($type->category, $channel, $context) ?? new ChannelPreference($type->defaultChannels[$channel] ?? false);
+        return $this->stack($type->category, $channel, $context) ?? new ChannelPreference($this->typeDefault($type, $channel));
+    }
+
+    /**
+     * The default a type gets when nothing is stored: for a type of a category shown in the matrix, the category's
+     * default, so what the page shows is what is delivered (audit ZAL-3: in a category whose types disagree, a channel
+     * on for one type is on for all of them until the person turns it off); otherwise the type's own default.
+     */
+    private function typeDefault(TypeDefinition $type, string $channel): bool
+    {
+        if ($type->inMatrix && isset($this->defaults[$type->category][$channel])) {
+            return $this->defaults[$type->category][$channel];
+        }
+
+        return $type->isDefaultOn($channel);
     }
 
     /**

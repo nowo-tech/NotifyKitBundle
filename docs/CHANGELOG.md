@@ -44,6 +44,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Translations of the page in 7 locales; `docs/USAGE.md` (preferences, audit trail, browser console),
     `docs/CONFIGURATION.md`, `docs/CONCURRENCY.md`, `docs/TEMPLATES.md`, `docs/UPGRADING.md`.
 
+### Fixed
+
+- The AuditKit bridge is wired only when AuditKit flushes in `isolated` mode: in `host` mode `recordIdsAndFlush()` would
+  flush the host's entity manager with unrelated pending changes (REQ-ARCH-001 rule 6). `auto` skips it with a container
+  log line, `true` refuses to build; `nowo-tech/audit-kit-bundle` < 2.0 is a conflict (ZAL-1).
+- An optional bell of a type that does not name `in_app` in its defaults stays on, as in 0.3 (ZAL-2).
+- A type shown in the matrix takes its category's default when nothing is stored, so what the page shows is what is
+  delivered in categories whose types disagree (ZAL-3).
+- The no-JS form answers 404 when a context switch names a context the provider no longer lists, instead of writing the
+  account master switch (ZAL-4).
+- Insert-if-absent of a preference reads its new id back instead of trusting the affected-row count (MySQL
+  `CLIENT_FOUND_ROWS`, ZAL-I1); a failing audit write after *Run retention now* is logged, not answered 500 (ZAL-I2).
+- The bell script logs its REQ-ASSETS-005 "script loaded" line (ZAL-I3).
+
 ### Changed
 
 - Application services depend on the new `Application\UnitOfWorkInterface` port instead of the infrastructure

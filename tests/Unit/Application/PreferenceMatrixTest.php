@@ -111,6 +111,33 @@ final class PreferenceMatrixTest extends TestCase
         self::assertFalse($matrix->isLocked('cat', 'in_app'));
     }
 
+    public function testAProviderTypeWithoutAnInAppDefaultKeepsItsBell(): void
+    {
+        $provider = new TypeDefinition('provider.type', 'other', 'tabler:bell', 'k', null, [], []);
+        self::assertTrue($provider->isDefaultOn('in_app'), 'ZAL-2: as writesInApp() in S1');
+        self::assertFalse($provider->isDefaultOn('mail'));
+        self::assertTrue($this->matrix([])->resolveType($provider, 'in_app')->enabled, 'a category outside the matrix: the type default');
+    }
+
+    public function testWhatThePageShowsIsWhatIsDeliveredInAMixedCategory(): void
+    {
+        $registry = TypeRegistry::create([
+            'a.loud'  => $this->config('mixed', ['in_app' => true], true, []),
+            'a.quiet' => $this->config('mixed', ['in_app' => false], true, []),
+        ], [], [], false, null);
+        $defaults = PreferenceDefaults::of($registry);
+        $quiet    = $registry->type('a.quiet');
+
+        $untouched = $defaults->matrix(new RecipientRef('user', 'a'), []);
+        self::assertTrue($untouched->cell('mixed', 'in_app', null)->enabled, 'the page shows on');
+        self::assertTrue($untouched->resolveType($quiet, 'in_app')->enabled, 'ZAL-3: and the quiet type is delivered too');
+
+        $off = $defaults->matrix(new RecipientRef('user', 'a'), [new PreferenceRow(PreferenceKey::account('mixed', 'in_app'), false)]);
+        self::assertFalse($off->cell('mixed', 'in_app', null)->enabled);
+        self::assertFalse($off->resolveType($quiet, 'in_app')->enabled);
+        self::assertFalse($off->resolveType($registry->type('a.loud'), 'in_app')->enabled);
+    }
+
     /**
      * @param list<array{string, string, string, bool, string}> $rows
      */

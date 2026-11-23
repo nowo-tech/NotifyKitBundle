@@ -170,5 +170,6 @@ the others stay open and ride with the next slices.
 | §8.3 Push / Slack device links, quiet hours, digest | Not on the page | S4 (channels) |
 | §6.4 `limits.ui_writes` | Still not enforced (S4, with the other rate limits) | As in S2: logged-in person, CSRF, own rows only |
 | §6.7 audit of the channel switch | Only preference changes and *Run retention now* are audited | There is no operator channel switch before S4 |
-| Bell script REQ-ASSETS-005 line | The new preferences script logs it (`logger.ts`, `build-info.json`); the bell joins with its next change | Keep the S2 bell (PR #11) untouched while it is in review |
+| §6.7 AuditKit bridge | Wired only when AuditKit flushes in `isolated` mode (2.x default); `<2.0` is a conflict | Audit ZAL-1: AuditKit's `host` mode would flush the host's entity manager (REQ-ARCH-001 rule 6) |
+| §5.1 "only deviations from the type / category defaults" | A type shown in the matrix takes its category's default when nothing is stored (on when one of the category's types is on) | Audit ZAL-3: what the page shows is what is delivered |
 

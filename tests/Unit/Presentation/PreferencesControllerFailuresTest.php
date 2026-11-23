@@ -6,7 +6,11 @@ namespace Nowo\NotifyKitBundle\Tests\Unit\Presentation;
 
 use Nowo\NotifyKitBundle\Application\Preferences\PreferenceDefaults;
 use Nowo\NotifyKitBundle\Application\TypeRegistry;
+use Nowo\NotifyKitBundle\Contract\ContextChoice;
+use Nowo\NotifyKitBundle\Contract\ContextProviderInterface;
+use Nowo\NotifyKitBundle\Contract\ContextRef;
 use Nowo\NotifyKitBundle\Contract\Exception\InvalidNotificationArgumentException;
+use Nowo\NotifyKitBundle\Contract\PreferenceChangeSet;
 use Nowo\NotifyKitBundle\Contract\PreferencesInterface;
 use Nowo\NotifyKitBundle\Contract\RecipientRef;
 use Nowo\NotifyKitBundle\Presentation\Controller\PreferencesController;
@@ -27,6 +31,7 @@ use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
 use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
@@ -80,6 +85,30 @@ final class PreferencesControllerFailuresTest extends TestCase
         $this->controller(null)->save($this->master('tampered'));
     }
 
+    public function testAContextNoLongerListedIsA404NeverTheMasterSwitch(): void
+    {
+        $contexts = $this->createStub(ContextProviderInterface::class);
+        $contexts->method('contextsFor')->willReturnOnConsecutiveCalls([new ContextChoice(new ContextRef('project', '42'), 'Apollo')], []);
+        $preferences = $this->createMock(PreferencesInterface::class);
+        $preferences->method('matrixFor')->willReturn(PreferenceDefaults::of($this->registry())->matrix(new RecipientRef('user', 'alice'), []));
+        $preferences->expects(self::never())->method('save');
+        $controller = $this->controller(null, preferences: $preferences, contexts: $contexts);
+
+        $this->expectException(NotFoundHttpException::class);
+        $controller->save($this->form('/', ['nkp' => ['_token' => 'ok', 'kw' => '-', 'vw' => '1', 'w' => '1', 'kx0' => '-', 'vx0' => '1']]));
+    }
+
+    public function testAListedContextSwitchIsSavedOnItsOwnCell(): void
+    {
+        $preferences = $this->createMock(PreferencesInterface::class);
+        $preferences->method('matrixFor')->willReturn(PreferenceDefaults::of($this->registry())->matrix(new RecipientRef('user', 'alice'), []));
+        $preferences->expects(self::once())->method('save')->with(self::anything(), self::callback(
+            static fn (PreferenceChangeSet $set): bool => $set->changes[0]->key->toString() === 'project:42/*/*' && !$set->changes[0]->enabled,
+        ))->willReturn([]);
+
+        self::assertSame(302, $this->controller(null, preferences: $preferences)->save($this->form('/', ['nkp' => ['_token' => 'ok', 'kw' => '-', 'vw' => '1', 'w' => '1', 'kx0' => '-', 'vx0' => '1', 'vs0' => 'all']]))->getStatusCode());
+    }
+
     public function testAFormWithoutScopeSelectsSavesTheScopeAll(): void
     {
         $preferences = $this->preferences(null);
@@ -115,7 +144,7 @@ final class PreferencesControllerFailuresTest extends TestCase
     /**
      * @param list<string> $scopes
      */
-    private function controller(?Throwable $failure, array $scopes = ['all', 'involved'], ?PreferencesInterface $preferences = null): PreferencesController
+    private function controller(?Throwable $failure, array $scopes = ['all', 'involved'], ?PreferencesInterface $preferences = null, ?ContextProviderInterface $contexts = null): PreferencesController
     {
         $registry = $this->registry();
         $user     = new InMemoryUser('alice', null, ['ROLE_USER']);
@@ -126,7 +155,7 @@ final class PreferencesControllerFailuresTest extends TestCase
 
         return new PreferencesController(
             $preferences ?? $this->preferences($failure),
-            new ProjectContextProvider(['user:alice' => ['42' => 'Apollo']]),
+            $contexts ?? new ProjectContextProvider(['user:alice' => ['42' => 'Apollo']]),
             new CurrentRecipient($tokens, new WebRecipientResolver()),
             new RoleAccessChecker(null, []),
             new PreferencePages($registry, new Translator('en'), $scopes),

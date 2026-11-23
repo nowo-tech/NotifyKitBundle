@@ -118,7 +118,7 @@ nowo_notify_kit:
 | `web_ui.templates.preferences` | Your page template (extend `@!NowoNotifyKitBundle/preferences/index.html.twig`) |
 | `web_ui.security.preferences_roles` | Roles that open the preferences page; `null` (default) = `access_roles`; `[]` = any logged-in person |
 | `web_ui.security.preferences_access_checker` | Your `PreferencesAccessCheckerInterface` service (REQ-UI-002) |
-| `bridges.audit_kit` | `auto` (default): record `notify.preferences_changed` and `notify.retention_run` in AuditKit's action log when it is on; `true`: refuse to build without it; `false`: never |
+| `bridges.audit_kit` | `auto` (default): record `notify.preferences_changed` and `notify.retention_run` in AuditKit's action log when it is on **and** `nowo_audit_kit.action_log.flush_mode` is `isolated` (otherwise off, with a container log line: the bundle never flushes your entity manager); `true`: refuse to build without it or in another flush mode; `false`: never |
 | `fan_out.max_recipients` | Also caps `NotificationRequest::$involved` (audit QL-I3) |
 
 ## Container parameters

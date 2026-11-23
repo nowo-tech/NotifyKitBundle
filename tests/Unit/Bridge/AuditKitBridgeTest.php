@@ -20,6 +20,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 use function array_fill;
+use function implode;
 
 /**
  * The AuditKit bridge (contract §6.7): what reaches AuditKit's action log (ids, keys and counts only), the listener of
@@ -83,10 +84,31 @@ final class AuditKitBridgeTest extends TestCase
         (new AuditKitBridgePass())->process($this->container(true));
     }
 
-    private function container(bool|string $mode): ContainerBuilder
+    public function testTheBridgeIsNeverWiredWhenAuditKitWouldFlushTheHostEntityManager(): void
+    {
+        foreach (['host', null] as $flushMode) {
+            $container = $this->container('auto', $flushMode);
+            $container->register(AuditKitBridgePass::RECORDER, 'stdClass');
+            (new AuditKitBridgePass())->process($container);
+            self::assertSame(NullAuditTrail::class, (string) $container->getAlias(AuditTrailInterface::class), 'ZAL-1: auto leaves the null trail');
+            self::assertFalse($container->hasDefinition(PreferencesAuditListener::class));
+            self::assertStringContainsString('flush_mode: isolated', implode("\n", $container->getCompiler()->getLog()));
+        }
+
+        $container = $this->container(true, 'host');
+        $container->register(AuditKitBridgePass::RECORDER, 'stdClass');
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('"host" mode');
+        (new AuditKitBridgePass())->process($container);
+    }
+
+    private function container(bool|string $mode, ?string $flushMode = AuditKitBridgePass::ISOLATED): ContainerBuilder
     {
         $container = new ContainerBuilder();
         $container->setParameter('nowo_notify_kit.config', ['bridges' => ['audit_kit' => $mode]]);
+        if ($flushMode !== null) {
+            $container->setParameter(AuditKitBridgePass::FLUSH_MODE, $flushMode);
+        }
         $container->register(NullAuditTrail::class, NullAuditTrail::class);
         $container->setAlias(AuditTrailInterface::class, NullAuditTrail::class);
 

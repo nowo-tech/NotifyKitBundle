@@ -59,7 +59,7 @@ export default defineConfig(({ mode }) => {
   const target = mode === 'preferences' ? ENTRIES.preferences : ENTRIES.bell;
 
   return {
-    define: mode === 'preferences' ? { __NOTIFY_KIT_BUILD_TIME__: JSON.stringify(buildTimeLabel('src/Resources/assets/src')) } : {},
+    define: { __NOTIFY_KIT_BUILD_TIME__: JSON.stringify(buildTimeLabel('src/Resources/assets/src')) },
     build: {
       outDir: 'src/Resources/public/js',
       emptyOutDir: false,
