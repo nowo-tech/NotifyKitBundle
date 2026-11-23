@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Nowo\NotifyKitBundle\Presentation\View;
 
 use DateTimeImmutable;
-use Nowo\NotifyKitBundle\Presentation\TranslationDomain;
+use Nowo\NotifyKitBundle\Contract\TranslationDomain;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 use function intdiv;

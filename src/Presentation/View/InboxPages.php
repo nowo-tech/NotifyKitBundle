@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Nowo\NotifyKitBundle\Presentation\View;
 
+use Nowo\NotifyKitBundle\Contract\TranslationDomain;
 use Nowo\NotifyKitBundle\Domain\InboxStatistics;
-use Nowo\NotifyKitBundle\Presentation\TranslationDomain;
 use Nowo\UiKitBundle\View\Action;
 use Nowo\UiKitBundle\View\Column;
 use Nowo\UiKitBundle\View\DetailItem;

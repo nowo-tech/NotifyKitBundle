@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\NotifyKitBundle;
 
+use Nowo\NotifyKitBundle\Contract\TranslationDomain;
 use Nowo\NotifyKitBundle\DependencyInjection\Compiler\AfterCommitMiddlewarePass;
 use Nowo\NotifyKitBundle\DependencyInjection\Compiler\AuditKitBridgePass;
 use Nowo\NotifyKitBundle\DependencyInjection\Compiler\RealtimePass;
@@ -11,7 +12,6 @@ use Nowo\NotifyKitBundle\DependencyInjection\Compiler\RequireDoctrinePass;
 use Nowo\NotifyKitBundle\DependencyInjection\Compiler\TwigPathsPass;
 use Nowo\NotifyKitBundle\DependencyInjection\Compiler\WebUiPass;
 use Nowo\NotifyKitBundle\DependencyInjection\NowoNotifyKitExtension;
-use Nowo\NotifyKitBundle\Presentation\TranslationDomain;
 use Symfony\Component\DependencyInjection\Compiler\PassConfig;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;

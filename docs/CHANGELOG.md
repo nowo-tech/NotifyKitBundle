@@ -26,7 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   `Infrastructure\Identity\UuidV7NotificationIdGenerator`; a hand-built `Notifier` without the new optional last
   argument falls back to a plain-PHP UUIDv7); the bell renderer takes the new
   `Application\Realtime\RealtimeSubscriptionInterface` (implemented by `MercureSubscription`); the UI layer reads
-  the translation domain from `Presentation\TranslationDomain::NAME` (`NowoNotifyKitBundle::TRANSLATION_DOMAIN`
+  the translation domain from `Contract\TranslationDomain::NAME` (`NowoNotifyKitBundle::TRANSLATION_DOMAIN`
   keeps the same value).
 
 ## [0.4.0] - 2026-11-23
