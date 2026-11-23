@@ -198,7 +198,7 @@ changed (`all: true` for *mark all*, `read: false` for *mark unread*).
 | `realtime.mode` | What happens |
 | --- | --- |
 | `auto` (default) | `mercure` when a Mercure hub service exists (MercureBundle), else `poll` |
-| `mercure` | After each commit, one **private** update per recipient on `notify-kit/r/<hmac>` (HMAC-SHA256 of the recipient key with `kernel.secret`), payload `{"event":"notify.updated","unread":n}` only. The bell sets the subscriber cookie for the person's own topic (MercureBundle `Authorization`; a hub on another site falls back to polling); `RealtimeTopics::subscribeClaimFor()` gives you the claim for your own JWT. Without a hub the container refuses to build |
+| `mercure` | After each commit, one **private** update per recipient on `notify-kit/r/<hmac>` (HMAC-SHA256 of the recipient key with `kernel.secret`), payload `{"event":"notify.updated","unread":n}` only. The bell sets the subscriber cookie for the person's own topic (MercureBundle `Authorization`; when the cookie cannot be set, e.g. a hub on another site or symfony/mercure 0.10's `__Secure-` cookie on plain HTTP, the bell falls back to polling); `RealtimeTopics::subscribeClaimFor()` gives you the claim for your own JWT. Without a hub the container refuses to build |
 | `poll` | The bell polls `…/count` every `realtime.poll_seconds` (≥ 10), paused while the tab is hidden |
 | `off` | No updates; the count refreshes on the next page |
 
