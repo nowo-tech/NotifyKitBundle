@@ -160,7 +160,8 @@ final class AfterCommitQueue implements ResetInterface
     public function reset(): void
     {
         $this->drain();
-        $count = $this->heldCount();
+        $this->ready = [];
+        $count       = $this->heldCount();
         if ($count > 0) {
             ($this->logger ?? new NullLogger())->warning('nowo_notify_kit: dropped {count} after-commit item(s) of a transaction that did not commit through the bundle middleware.', ['count' => $count]);
         }
