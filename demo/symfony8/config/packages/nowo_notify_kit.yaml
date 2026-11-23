@@ -1,3 +1,20 @@
-# S0 scaffold: the bundle is installed and disabled. Later slices turn the demo features on here.
+# S2: inbox, header bell (polling every 10 s in the demo) and operator page for the two demo people.
 nowo_notify_kit:
-    enabled: false
+    enabled: true
+    recipient:
+        resolver: App\Notify\DemoRecipientResolver
+    access:
+        checker: App\Notify\DemoAccessChecker
+    categories:
+        account: { label: notify.category.account, order: 10 }
+        projects: { label: notify.category.projects, order: 20 }
+    types:
+        demo.welcome: { category: account, icon: 'tabler:hand-stop' }
+        demo.project_update: { category: projects, icon: 'tabler:folder', permission: project.view }
+    realtime:
+        mode: poll
+        poll_seconds: 10
+    web_ui:
+        enabled: true
+    admin_ui:
+        enabled: true

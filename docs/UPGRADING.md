@@ -3,12 +3,37 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+  - [S2: inbox, bell and pages](#s2-inbox-bell-and-pages)
 - [To 0.2.0](#to-020)
   - [Lock conflicts answer 409 + CONFLICT codes](#lock-conflicts-answer-409--conflict-codes)
 - [To 0.1.1](#to-011)
 - [To 0.1.0](#to-010)
 
 ## Unreleased
+
+### S2: inbox, bell and pages
+
+```bash
+composer update nowo-tech/notify-kit-bundle --with-all-dependencies
+php bin/console assets:install
+```
+
+- **New dependencies**: `nowo-tech/ui-kit-bundle` ^2.68, `nowo-tech/form-kit-bundle` ^2.24 and the Symfony form,
+  security-core / security-csrf, routing, translation and Twig packages. Register `NowoUiKitBundle`,
+  `NowoFormKitBundle` and `TwigExtraBundle` if Flex did not.
+- **No schema change.** The read side uses the existing indexes.
+- **Nothing changes until you turn it on.** `web_ui.enabled` and `admin_ui.enabled` stay `false`; `realtime.mode: auto`
+  only publishes when a Mercure hub service exists (otherwise it is `poll`, and nothing is published).
+- To use the pages: import `@NowoNotifyKitBundle/Resources/config/routes.php`, set `recipient.class` or
+  `recipient.resolver` (the container refuses `web_ui` without one), keep SecurityBundle and add `access_control` for
+  `web_ui.path_prefix` (`ROLE_USER`) and `admin_ui.path_prefix` (`ROLE_ADMIN`); render `{{ notify_kit_bell() }}` in
+  your header. See [USAGE](USAGE.md#inbox-bell-and-pages-s2).
+- **`InboxInterface`** gains `unreadCount()`, `page()`, `markRead()`, `markUnread()` and `markAllRead()` (it was
+  documented as bundle-implemented only). **`TypeDefinition`** gains an optional last argument `titleDomain`.
+- **Read-time visibility**: rows with a context whose permission the checker no longer grants are hidden (and not
+  counted) at once; a row with a stored context the value objects refuse is hidden for everyone.
+- `DoctrineRecipientResolver::userOf()` returns the managed instance untouched (audit QL-L4); a user it loads is still
+  detached.
 
 ## To 0.2.0
 

@@ -25,8 +25,9 @@ EntityManager.
 
 ## Features
 
-Available in S1: the entry point, the in-app rows (coalescing, dedupe, write-time access), the type registry,
-retention, the schema check, transaction-safe writes (transient failures ready for a 409 + `CONFLICT_001` answer). Planned (see the roadmap): the rest.
+Available: the entry point, the in-app rows (coalescing, dedupe, write-time access), the type registry, retention, the
+schema check, transaction-safe writes (S1); read-time visibility, the inbox read side, the header bell, the inbox and
+operator pages and the realtime badge (S2, in review). Planned (see the roadmap): the rest.
 
 - **One entry point**, `NotifierInterface::notify()`: type, recipients (by id), actor, context, target, local URL,
   params, urgency, *involved* people; validated, written after your commit, fanned out per recipient and channel.
@@ -66,15 +67,20 @@ Every key of the contract is already accepted (strict tree): [docs/CONFIGURATION
 
 ## Demo
 
-`demo/symfony8`: Symfony 8.1, FrankenPHP worker mode, MySQL, on http://localhost:8222 (`make -C demo up`), built on UiKit; `make -C demo/symfony8 test-e2e` runs the Playwright check.
+`demo/symfony8`: Symfony 8.1, FrankenPHP worker mode, MySQL, on http://localhost:8222 (`make -C demo up`), built on UiKit. Sign in as Alice or Bob, send notifications and watch the bell, the inbox page and (Alice) the operator page; `make -C demo/symfony8 test-e2e` runs the Playwright checks (bell, mark read, live badge, deny by default, axe).
 
 ![Notify Kit demo](docs/images/demo/overview.webp)
+
+![The header bell](docs/images/demo/bell.webp)
+
+![The inbox page](docs/images/demo/inbox.webp)
 
 ## Documentation
 
 - [Installation](docs/INSTALLATION.md)
 - [Configuration](docs/CONFIGURATION.md)
-- [Usage](docs/USAGE.md) (incl. using it from a DDD / hexagonal application)
+- [Usage](docs/USAGE.md) (incl. the bell and pages, and using it from a DDD / hexagonal application)
+- [Templates](docs/TEMPLATES.md) (pages, partials, assets, overrides)
 - [Roadmap](docs/ROADMAP.md) (slices and open questions)
 - [Contract](docs/CONTRACT.md)
 - [Security](docs/SECURITY.md)
@@ -94,6 +100,7 @@ make release-check      # every gate, demo included
 ```
 
 - PHP: 100 % of `src/` (gate in CI).
+- TypeScript (bell script): ≥ 90 % (Vitest gate, `make test-ts`).
 
 ## License
 

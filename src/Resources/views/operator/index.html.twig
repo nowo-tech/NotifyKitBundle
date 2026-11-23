@@ -1,0 +1,9 @@
+{#
+  Operator page (contract §8.4, REQ-UI-003): UiKit show scaffold. Variable: page (Nowo\UiKitBundle\View\ShowPage):
+  key figures (rows, unread, live dedupe markers), the rows written per type in the period, the delivery set-up, and
+  the header action *Run retention now* (CSRF form). Counts only: no notification content, no recipient.
+
+  Override: a template that extends '@!NowoNotifyKitBundle/operator/index.html.twig'. Restyle through
+  nowo_ui_kit.theme (slots).
+#}
+{% extends '@NowoUiKitBundle/page/show.html.twig' %}

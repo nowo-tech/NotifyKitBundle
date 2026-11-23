@@ -12,7 +12,7 @@ Related: [`docs/SPEC-DRIVEN-DEVELOPMENT.md`](../../docs/SPEC-DRIVEN-DEVELOPMENT.
 
 ## Summary
 
-S0 guarantees (S1 adds the in-app inbox, see [`../002-s1-core-inbox/spec.md`](../002-s1-core-inbox/spec.md)): the bundle registers in a standard Symfony host with zero configuration; the configuration root
+S0 guarantees (S1 adds the in-app inbox, see [`../002-s1-core-inbox/spec.md`](../002-s1-core-inbox/spec.md); S2 the read side, bell and pages, see [`../003-s2-access-ui/spec.md`](../003-s2-access-ui/spec.md)): the bundle registers in a standard Symfony host with zero configuration; the configuration root
 `nowo_notify_kit` is strict (unknown keys and invalid values are refused with the path in the message) and already holds
 every key of the contract; `enabled` defaults to false; S0 registers no service, route, listener or table, whatever the
 configuration says; the container parameters `nowo_notify_kit.enabled`, `nowo_notify_kit.api_prefix`, `nowo_notify_kit.table_prefix`

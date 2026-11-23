@@ -1,14 +1,18 @@
-{#- REQ-DEMO-014: the demo runs inside UiKit's shared demo platform shell. This file only declares the demo (one status
-    page, so a single nav item). -#}
+{#- REQ-DEMO-014: the demo runs inside UiKit's shared demo platform shell. The header bell of the bundle sits in the top
+    bar (notify_kit_bell(), nothing for guests). -#}
 {% extends '@NowoUiKit/demo_platform/layout.html.twig' %}
 {% set nowo_ui_demo_platform = {
     bundle: 'Notify Kit',
-    version: 'S0 scaffold',
+    version: 'S2 access + UI',
     home_route: 'demo_home',
     repository: 'https://github.com/nowo-tech/NotifyKitBundle',
     translation_domain: false,
+    auth: {logout_route: 'demo_logout'},
     nav: [
-        {label: 'Status', route: 'demo_home', section: 'Demo'},
+        {label: 'Home', route: 'demo_home', section: 'Demo'},
+        {label: 'Inbox', route: 'nowo_notify_kit_inbox', active: ['nowo_notify_kit_inbox'], section: 'Notifications', testid: 'demo-nav-inbox'},
+        {label: 'Operator page', route: 'nowo_notify_kit_operator', section: 'Notifications', testid: 'demo-nav-operator'},
     ],
 } %}
 {% block nowo_ui_document_title %}{% block title %}Notify Kit Bundle demo{% endblock %}{% endblock %}
+{% block nowo_ui_demo_platform_header_end %}{{ notify_kit_bell() }}{% endblock %}

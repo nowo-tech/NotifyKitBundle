@@ -1,0 +1,10 @@
+notify:
+    type:
+        invitation_accepted:
+            title: "%actor% accepted your invitation to %name%"
+        billing:
+            ready:
+                title: "Your export %target% is ready"
+        issue:
+            assigned:
+                title: "%actor% assigned you an issue"

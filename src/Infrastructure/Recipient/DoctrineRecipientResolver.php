@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Nowo\NotifyKitBundle\Infrastructure\Recipient;
 
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;
 use LogicException;
 use Nowo\NotifyKitBundle\Contract\Exception\InvalidNotificationArgumentException;
@@ -22,8 +21,9 @@ use function sprintf;
  * Default {@see RecipientResolverInterface} of standard hosts (`recipient.class`): the identifier field of a Doctrine
  * entity, type `recipient.type` (default `user`).
  *
- * `userOf()` reads a fresh row and detaches it again when it was not managed before, so a worker never keeps a user
- * loaded for one request; the result is re-checked with `===` (audit LQ).
+ * `userOf()` returns the instance the host's entity manager already manages, untouched (no refresh: a managed, dirty
+ * user is never overwritten, audit QL-L4); a user it had to load is detached again, so a worker never keeps a user
+ * loaded for one request. The result is re-checked with `===` (audit LQ).
  */
 final readonly class DoctrineRecipientResolver implements RecipientResolverInterface
 {
@@ -78,7 +78,6 @@ final readonly class DoctrineRecipientResolver implements RecipientResolverInter
             ->setParameter('id', $recipient->id)
             ->setMaxResults(1)
             ->getQuery()
-            ->setHint(Query::HINT_REFRESH, true)
             ->getOneOrNullResult();
         if (!is_object($user)) {
             return null;

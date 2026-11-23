@@ -20,7 +20,7 @@ nowo_notify_kit:
     access: { checker: null, default_permission: null }   # the container refuses a type with a permission and no checker (Q-O6)
     types:                                                # merged with tagged TypeProviderInterface services and bridges
         # invitation_accepted: { category: account, icon: 'tabler:mail-check', permission: null, channels: { in_app: true, mail: false } }
-        # Other keys: title_key (null), in_app_optional (false, Q-O2), locked_channels ([]), urgency (low|normal|high),
+        # Other keys: title_key (null), title_domain (null = messages), in_app_optional (false, Q-O2), locked_channels ([]), urgency (low|normal|high),
         #             coalesce (true), in_matrix (true)
     categories:
         # account: { label: 'notify.category.account', group: general, order: 10 }
@@ -51,7 +51,7 @@ nowo_notify_kit:
         preferences_path: '/account/notifications'
         layout_template: null
         templates: { bell: null, menu: null, inbox: null, preferences: null, email: null }
-        security: { access_roles: ['ROLE_USER'] }
+        security: { access_roles: ['ROLE_USER'], access_checker: null }
     admin_ui:
         enabled: false
         path_prefix: '/admin/notifications'
@@ -86,6 +86,22 @@ nowo_notify_kit:
 | `fan_out.max_recipients` | Most recipients per request |
 | `retention.*`, `messenger.max_seconds` | `nowo:notify-kit:prune` and `PruneNotificationsMessage` |
 
+### Keys read in S2
+
+| Key | Effect |
+| --- | --- |
+| `recipient.directory` | Your `RecipientDirectoryInterface` service (display names of actors); `null` = the user object through the recipient resolver (`__toString()`, `getEmail()`, `getLocale()`) |
+| `access.checker` / `default_permission` (read time) | The same checker filters the inbox at read time: asked once per permission with every context of the person's rows |
+| `types.<key>.title_domain` | Translation domain of the type's `title_key` (default `messages`) |
+| `inbox.menu_limit` / `page_size` | Rows in the bell menu / per inbox page |
+| `realtime.mode` | `auto` (Mercure when a hub service exists, else `poll`), `mercure` (refuses to build without a hub), `poll`, `off` |
+| `realtime.poll_seconds` | Poll interval of the bell (paused while the tab is hidden) |
+| `realtime.publisher` | Your `RealtimePublisherInterface` service (used as is; effective mode `host`) |
+| `preferences.contexts.provider` | Your `ContextProviderInterface` service (context labels on the rows; the per-context matrix arrives in S3) |
+| `web_ui.enabled` / `path_prefix` / `layout_template` / `templates.{bell,menu,inbox}` | The inbox page, bell endpoints and templates; needs `recipient.class` or `recipient.resolver`, Twig, forms, CSRF and SecurityBundle |
+| `web_ui.security.access_roles` / `access_checker` | REQ-UI-002: one of the roles (`[]` = any logged-in person), or your `InboxAccessCheckerInterface` service |
+| `admin_ui.enabled` / `path_prefix` / `security.*` | The operator page: `access_roles` (`ROLE_ADMIN`), `access_checker` (`OperatorAccessCheckerInterface`), `allow_unauthenticated` (demo only: also lets the page run without SecurityBundle) |
+
 ## Container parameters
 
 | Parameter | Value |
@@ -94,6 +110,8 @@ nowo_notify_kit:
 | `nowo_notify_kit.api_prefix` | `api.prefix` |
 | `nowo_notify_kit.table_prefix` | `doctrine.table_prefix` |
 | `nowo_notify_kit.config` | the processed tree |
+| `nowo_notify_kit.realtime_mode` | the effective realtime mode: `mercure`, `host`, `poll` or `off` (enabled bundle) |
+| `nowo_notify_kit.realtime_requested` | `realtime.mode` as configured (enabled bundle) |
 
 ## Validation rules
 

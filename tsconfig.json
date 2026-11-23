@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "rootDir": ".",
+    "types": ["vitest/globals"]
+  },
+  "include": ["src/Resources/assets/src", "src/Resources/assets/stimulus-peers", "src/Resources/assets/tests", "vite.config.ts", "vitest.config.ts"]
+}

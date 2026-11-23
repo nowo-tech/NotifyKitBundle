@@ -51,7 +51,7 @@ final class ConfigurationTest extends TestCase
             'preferences_path' => '/account/notifications',
             'layout_template'  => null,
             'templates'        => ['bell' => null, 'menu' => null, 'inbox' => null, 'preferences' => null, 'email' => null],
-            'security'         => ['access_roles' => ['ROLE_USER']],
+            'security'         => ['access_roles' => ['ROLE_USER'], 'access_checker' => null],
         ], $config['web_ui']);
         self::assertSame(['enabled' => false, 'path_prefix' => '/admin/notifications', 'security' => ['access_roles' => ['ROLE_ADMIN'], 'access_checker' => null, 'allow_unauthenticated' => false]], $config['admin_ui']);
         self::assertSame(['enabled' => false, 'prefix' => '/api'], $config['api']);
@@ -83,7 +83,7 @@ final class ConfigurationTest extends TestCase
             'api'         => ['enabled' => true, 'prefix' => '/v-api'],
         ]);
 
-        self::assertSame(['category' => 'issues', 'permission' => 'issue.view', 'urgency' => 'high', 'in_app_optional' => true, 'locked_channels' => ['mail'], 'icon' => null, 'title_key' => null, 'channels' => [], 'coalesce' => true, 'in_matrix' => true], $config['types']['issue.assigned']);
+        self::assertSame(['category' => 'issues', 'permission' => 'issue.view', 'urgency' => 'high', 'in_app_optional' => true, 'locked_channels' => ['mail'], 'icon' => null, 'title_key' => null, 'title_domain' => null, 'channels' => [], 'coalesce' => true, 'in_matrix' => true], $config['types']['issue.assigned']);
         self::assertSame(['in_app' => true, 'mail' => false], $config['types']['invitation_accepted']['channels']);
         self::assertSame('https://app.example.com/base', $config['links']['base_url']);
         self::assertSame('Europe/Madrid', $config['quiet_hours']['default_timezone']);

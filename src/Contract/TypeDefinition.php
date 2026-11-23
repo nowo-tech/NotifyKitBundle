@@ -32,6 +32,8 @@ final readonly class TypeDefinition
      * @param list<string> $lockedChannels channels the person cannot turn off (`in_app` unless the type opts out)
      * @param bool $coalesce whether a repeat of the same target within the repeat window updates the unread row
      * @param bool $inMatrix whether the type's category is shown in the preferences matrix (S3)
+     * @param string|null $titleDomain translation domain of $titleKey (the producer's domain, contract §8.5); null =
+     *                                 `messages`
      */
     public function __construct(
         public string $key,
@@ -44,6 +46,7 @@ final readonly class TypeDefinition
         public Urgency $urgency = Urgency::Normal,
         public bool $coalesce = true,
         public bool $inMatrix = true,
+        public ?string $titleDomain = null,
     ) {
         Guard::type('TypeDefinition key', $key);
         Guard::key('TypeDefinition category', $category);
@@ -51,6 +54,9 @@ final readonly class TypeDefinition
         Guard::identifier('TypeDefinition titleKey', $titleKey, 200);
         if ($permission !== null) {
             Guard::identifier('TypeDefinition permission', $permission, 100);
+        }
+        if ($titleDomain !== null) {
+            Guard::identifier('TypeDefinition titleDomain', $titleDomain, 100);
         }
         foreach ($defaultChannels as $channel => $enabled) {
             if (!is_string($channel) || !is_bool($enabled)) {

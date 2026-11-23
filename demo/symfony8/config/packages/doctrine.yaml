@@ -1,3 +1,5 @@
 doctrine:
   dbal:
     url: '%env(resolve:DATABASE_URL)%'
+  # The bundle registers its XML mapping on the default entity manager (doctrine.auto_mapping, standard host).
+  orm: ~

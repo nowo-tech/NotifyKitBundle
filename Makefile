@@ -9,7 +9,7 @@ COMPOSE_BIN := $(shell $(DOCKER_BIN) compose version >/dev/null 2>&1 && echo "$(
 COMPOSE     := $(COMPOSE_BIN) -f $(COMPOSE_FILE)
 SERVICE_PHP := php
 
-.PHONY: help up down down-dev build shell install ensure-up test test-coverage test-coverage-100 coverage-check validate-phpdoc coverage-php-percent cs-check cs-fix qa clean release-check release-check-demos demo-smoke composer-sync rector rector-dry phpstan igor update validate assets setup-hooks check-no-cursor-coauthor check-open-prs check-no-raw-html-form check-twig-extra validate-translations test-with-db test-coverage-with-db strip-cursor-coauthor-from-history
+.PHONY: help up down down-dev build shell install ensure-up test test-ts test-coverage test-coverage-100 coverage-check validate-phpdoc coverage-php-percent cs-check cs-fix qa clean release-check release-check-demos demo-smoke composer-sync rector rector-dry phpstan igor update validate assets setup-hooks check-no-cursor-coauthor check-open-prs check-no-raw-html-form check-twig-extra validate-translations test-with-db test-coverage-with-db strip-cursor-coauthor-from-history
 
 help:
 	@echo "Notify Kit Bundle - Development Commands"
@@ -23,7 +23,8 @@ help:
 	@echo "  build         Rebuild Docker image (no cache)"
 	@echo "  shell         Open shell in container"
 	@echo "  install       Install Composer dependencies"
-	@echo "  assets        No-op (no frontend assets in this bundle)"
+	@echo "  assets        Build the bell script (pnpm run build: src/Resources/public/js/nowo-notify-kit-bell.js)"
+	@echo "  test-ts       Type check + Vitest with the 90 % coverage gate (bell script)"
 	@echo "  test          Run PHPUnit tests (starts container if needed)"
 	@echo "  test-coverage Run tests with code coverage (starts container if needed)"
 	@echo "  test-coverage-100 Run tests with coverage and fail below 100% (REQ-TEST-003 / REQ-TEST-006)"
@@ -145,6 +146,7 @@ release-check:
 	@$(MAKE) validate-phpdoc
 	@$(MAKE) igor
 	@$(MAKE) validate-translations
+	@$(MAKE) test-ts
 	@$(MAKE) test-coverage
 	@$(MAKE) coverage-check
 	@$(MAKE) release-check-demos
@@ -184,8 +186,15 @@ composer-sync: ensure-up
 clean: ensure-up
 	$(COMPOSE) exec -T $(SERVICE_PHP) sh -c "rm -rf vendor .phpunit.cache coverage coverage.xml .php-cs-fixer.cache"
 
+# Bell script: TypeScript under src/Resources/assets, built to src/Resources/public/js (pnpm on the host; Node >= 22).
 assets:
-	@echo "No frontend assets in this bundle (pages use UiKit assets)."
+	pnpm install --frozen-lockfile
+	pnpm run build
+
+test-ts:
+	pnpm install --frozen-lockfile
+	pnpm run typecheck
+	pnpm run test:coverage
 
 
 

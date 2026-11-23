@@ -18,6 +18,11 @@
 /.symfony export-ignore
 /Dockerfile export-ignore
 /Makefile export-ignore
+/package.json export-ignore
+/pnpm-lock.yaml export-ignore
+/tsconfig.json export-ignore
+/vite.config.ts export-ignore
+/vitest.config.ts export-ignore
 /demo export-ignore
 /docker-compose.yml export-ignore
 /docs/images export-ignore

@@ -52,6 +52,31 @@ defaults, the commands `nowo:notify-kit:prune` and `nowo:notify-kit:schema-check
 `PruneNotificationsMessage` handler. See [CONFIGURATION.md](CONFIGURATION.md) for every key and [USAGE.md](USAGE.md) for
 the calls.
 
+### Pages and bell (S2)
+
+With `web_ui.enabled` / `admin_ui.enabled`:
+
+1. Import the routes (the import adds nothing while both are off, or while the bundle is disabled):
+
+   ```yaml
+   # config/routes/nowo_notify_kit.yaml
+   nowo_notify_kit:
+       resource: '@NowoNotifyKitBundle/Resources/config/routes.php'
+   ```
+
+2. Keep SecurityBundle and protect the prefixes (REQ-UI-002 layer 1):
+
+   ```yaml
+   security:
+       access_control:
+           - { path: ^/admin/notifications, roles: ROLE_ADMIN }
+           - { path: ^/notifications, roles: ROLE_USER }
+   ```
+
+3. Register `NowoUiKitBundle`, `NowoFormKitBundle` and `TwigExtraBundle` (Flex does it), run
+   `php bin/console assets:install`, and render `{{ notify_kit_bell() }}` in your header.
+4. Optional realtime badge: install `symfony/mercure-bundle` (`realtime.mode: auto` then publishes private updates).
+
 ## Database
 
 The bundle owns its tables and maps them in XML by default (plain domain classes, referenced by id; the attribute

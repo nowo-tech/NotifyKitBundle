@@ -9,11 +9,31 @@
 
 ## Status
 
-S1 (core inbox): no route yet. `notify()` writes rows only for recipients who may open the target (a context row needs
-the type's permission granted by the host's access checker; the default checker grants nothing), refuses non-local URLs
-and caps params; every query by recipient is re-checked with `===` in PHP on binary-collated columns. Nothing renders
-notification content yet (titles and the bell arrive with S2). The configuration refuses a type or a default permission
-without an access checker (deny by default, Q-O6).
+S1 (core inbox): `notify()` writes rows only for recipients who may open the target (a context row needs the type's
+permission granted by the host's access checker; the default checker grants nothing), refuses non-local URLs and caps
+params; every query by recipient is re-checked with `===` in PHP on binary-collated columns. The configuration refuses
+a type or a default permission without an access checker (deny by default, Q-O6).
+
+S2 (access + UI, **immediate REQ-SEC-004 audit before the tag**):
+
+- **Read-time visibility.** Every read (count, page, row lookup, *mark all*) is scoped to the logged-in person (SQL
+  equality, byte comparison on MySQL, then `===` in PHP) and re-checks the context permission per call; a hidden row is
+  never listed, counted, read or marked; a damaged stored context is hidden for everyone.
+- **Row operations** look the row up by id **and** recipient; anything else answers 404 (REQ-REV-009).
+- **Web UI exposure (REQ-UI-002).** `web_ui` and `admin_ui` are off by default. When on: two layers (your firewall
+  `access_control` on the prefixes, and the bundle's access checkers: `web_ui.security.access_roles` default
+  `ROLE_USER`, `admin_ui.security.access_roles` default `ROLE_ADMIN`). The container refuses to build the pages without
+  SecurityBundle. `admin_ui.security.allow_unauthenticated` is a **demo-only footgun**: it opens the operator page
+  (counts and *Run retention now*) to anyone; never set it in production. The inbox has no such switch: it always needs
+  a logged-in person.
+- **CSRF** on every POST (`nowo_notify_kit_inbox`, `nowo_notify_kit_operator`): `X-CSRF-TOKEN` for `fetch`, FormKit
+  `_token` for forms; 403 otherwise. `_redirect` must be a local path before and after URL-decoding.
+- **Content.** Titles are built at display time and printed with autoescape inside `<bdi dir="auto">`; params cannot
+  override `%actor%` / `%target%`; the operator page shows counts only. Bell, menu, count and JSON answers are
+  `no-store, private`.
+- **Realtime.** Private Mercure updates on `notify-kit/r/<hmac>` (HMAC-SHA256 with `kernel.secret`), payload
+  `{event, unread}` only; the subscriber cookie names the person's own topic only.
+- Not yet: the `limits.ui_writes` rate limit (S4).
 
 ## Threat model
 

@@ -4,6 +4,10 @@ framework:
   handle_all_throwables: true
   php_errors:
     log: true
+  session: true
+  csrf_protection: true
+  form: true
+  assets: true
 
 when@test:
   framework:

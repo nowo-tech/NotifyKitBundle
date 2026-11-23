@@ -13,6 +13,9 @@ final class NotifyKitEvents
     /** {@see NotificationRecordedEvent}. */
     public const RECORDED = NotificationRecordedEvent::class;
 
+    /** {@see NotificationReadEvent}. */
+    public const READ = NotificationReadEvent::class;
+
     /** {@see NotificationSkippedEvent}. */
     public const SKIPPED = NotificationSkippedEvent::class;
 }

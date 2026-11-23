@@ -37,13 +37,16 @@ in [CONTRACT.md](CONTRACT.md#53-writes-transactions-and-events-rules-6-and-7); t
 | `InboxInterface::forgetContext()` | One unit per chunk (keyset by id, `batch_size` rows) | Chunked `DELETE … WHERE id IN (…)`; a repeated run finishes what a failed one left | `TransientStorageFailure`: `CONFLICT_001` for that chunk; earlier chunks stay deleted, run it again |
 | Retention: read rows older than the cutoff, per-recipient cap | One unit per chunk | Chunked `DELETE` by ids (keyset cursor) | `TransientStorageFailure` to the command / handler: run it again (a failed Messenger message goes through your retry strategy) |
 | Retention: expired dedupe markers | One unit per chunk | Chunked `DELETE` by key | Same |
+| `InboxInterface::markRead()` / `markUnread()` (S2) | One unit | Plain lookup by id **and** recipient, visibility re-check, then a conditional `UPDATE … SET read_at = ? WHERE id IN (?) AND recipient … AND read_at IS NULL` (or `IS NOT NULL`): no read-modify-write, idempotent, never touches the repeat count; a concurrent repeat on the row waits on the row lock | `TransientStorageFailure`: `CONFLICT_001`, nothing written; the endpoints answer 409 + `Retry-After` themselves |
+| `InboxInterface::markAllRead()` (S2) | One unit per batch (keyset by id over the visible unread rows, `batch_size` ids) | The same conditional `UPDATE` by ids (rows locked in primary-key order); the event and the badge follow the last batch | `TransientStorageFailure` for that batch; earlier batches stay read and a retry finishes the rest (idempotent), so the endpoint answers `CONFLICT_001` |
+| Operator *Run retention now* (S2) | Retention's own units | As retention | 409 + `CONFLICT_001` (the host's error page) |
 
-There is no read / archive / update path in 0.x. When S2 adds one, it is a conditional `UPDATE` (`WHERE read_at IS NULL`)
-in one unit and is listed here.
+Reads (unread count, pages, the bell) take no lock and open no transaction.
 
 ## Conflict answers and codes
 
-The bundle has no controller: a producer calls `notify()` from your code, so **you** answer. A deadlock, lock wait
+For `notify()`, `forgetContext()` and the other calls from your code, **you** answer (the bundle's own S2 endpoints
+answer 409 + `Retry-After` + the code themselves, JSON for `fetch`). A deadlock, lock wait
 timeout or serialization failure surfaces as `Nowo\TransactionContract\TransientStorageFailure`
 (`retryAfterSeconds()`, the storage error as `previous`), with nothing written. Answer it like the rest of the platform:
 
@@ -96,6 +99,9 @@ timeout or serialization failure surfaces as `Nowo\TransactionContract\Transient
 
 - `tests/Integration/Database/LoadReadinessTest.php` runs on MySQL 8.4, MariaDB 11.4 and PostgreSQL 16, with DBAL 4 and
   DBAL 3, and fails when skipped:
+  - *mark read* waiting on a row a repeat holds times out as `TransientStorageFailure` (`CONFLICT_001`, nothing
+    written, level 0) and the retry succeeds without losing the repeat (S2);
+  - *mark all as read* running in two processes against two repeating writers never loses a repeat (S2);
   - a repeat waiting for a row another connection holds times out as `TransientStorageFailure`, maps to
     `CONFLICT_001` with a `Retry-After` hint, leaves the connection at level 0 and writes nothing; the retry coalesces;
   - separate processes write the same recipient concurrently: no repeat is lost, none fails;

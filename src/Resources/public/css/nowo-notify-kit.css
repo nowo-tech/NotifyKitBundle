@@ -1,0 +1,222 @@
+/*
+ * NotifyKitBundle: header bell, bell menu and inbox page (contract §8.1). Plain CSS on UiKit tokens (--nowo-ui-*), no
+ * build step, no host CSS needed. Logical properties (RTL), dark mode through the tokens, reduced motion respected.
+ */
+.nowo-notify-kit-bell-wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.nowo-notify-kit-bell {
+    position: relative;
+}
+
+.nowo-notify-kit-bell > summary {
+    list-style: none;
+}
+
+.nowo-notify-kit-bell > summary::-webkit-details-marker {
+    display: none;
+}
+
+.nowo-notify-kit-bell__button {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    inline-size: var(--nowo-ui-control-height, 2.5rem);
+    block-size: var(--nowo-ui-control-height, 2.5rem);
+    border-radius: var(--nowo-ui-radius, 0.5rem);
+    color: var(--nowo-ui-text, currentColor);
+    cursor: pointer;
+}
+
+.nowo-notify-kit-bell__button:hover {
+    background: var(--nowo-ui-surface-muted, rgba(127, 127, 127, 0.12));
+}
+
+.nowo-notify-kit-bell__button:focus-visible {
+    outline: 2px solid var(--nowo-ui-focus-ring-color, currentColor);
+    outline-offset: 2px;
+}
+
+.nowo-notify-kit-bell__icon {
+    inline-size: 1.25rem;
+    block-size: 1.25rem;
+}
+
+.nowo-notify-kit-bell__badge {
+    position: absolute;
+    inset-block-start: 0.15rem;
+    inset-inline-end: 0.1rem;
+    min-inline-size: 1.15rem;
+    padding: 0 0.3rem;
+    border-radius: 999px;
+    background: var(--nowo-ui-danger, #c62828);
+    color: var(--nowo-ui-primary-contrast, #fff);
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.15rem;
+    text-align: center;
+}
+
+.nowo-notify-kit-bell__badge[hidden] {
+    display: none;
+}
+
+.nowo-notify-kit-bell__panel {
+    position: absolute;
+    z-index: var(--nowo-ui-z-overlay, 50);
+    inset-block-start: calc(100% + 0.35rem);
+    inset-inline-end: 0;
+    inline-size: min(24rem, calc(100vw - 1.5rem));
+    max-block-size: min(32rem, 75vh);
+    overflow: auto;
+    border: var(--nowo-ui-border-width, 1px) solid var(--nowo-ui-border, rgba(127, 127, 127, 0.3));
+    border-radius: var(--nowo-ui-radius, 0.5rem);
+    background: var(--nowo-ui-surface, #fff);
+    color: var(--nowo-ui-text, inherit);
+    box-shadow: var(--nowo-ui-shadow-popover, 0 8px 24px rgba(0, 0, 0, 0.18));
+}
+
+.nowo-notify-kit-bell[open] > .nowo-notify-kit-bell__panel {
+    animation: nowo-notify-kit-open 120ms var(--nowo-ui-motion-ease-out, ease-out);
+}
+
+@keyframes nowo-notify-kit-open {
+    from {
+        opacity: 0;
+        transform: translateY(-0.25rem);
+    }
+}
+
+.nowo-notify-kit-menu__head,
+.nowo-notify-kit-menu__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.6rem 0.85rem;
+}
+
+.nowo-notify-kit-menu__head {
+    border-block-end: var(--nowo-ui-border-width, 1px) solid var(--nowo-ui-border, rgba(127, 127, 127, 0.3));
+}
+
+.nowo-notify-kit-menu__foot {
+    border-block-start: var(--nowo-ui-border-width, 1px) solid var(--nowo-ui-border, rgba(127, 127, 127, 0.3));
+}
+
+.nowo-notify-kit-menu__title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.nowo-notify-kit-menu__empty,
+.nowo-notify-kit-menu__loading {
+    margin: 0;
+    padding: 1rem 0.85rem;
+    color: var(--nowo-ui-muted, inherit);
+}
+
+.nowo-notify-kit-menu__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.nowo-notify-kit-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.55rem 0.85rem;
+    border-block-end: var(--nowo-ui-border-width, 1px) solid var(--nowo-ui-border, rgba(127, 127, 127, 0.2));
+}
+
+.nowo-notify-kit-item:last-child {
+    border-block-end: 0;
+}
+
+.nowo-notify-kit-item.is-unread {
+    background: var(--nowo-ui-surface-muted, rgba(127, 127, 127, 0.08));
+}
+
+.nowo-notify-kit-item__link {
+    display: grid;
+    flex: 1;
+    gap: 0.15rem;
+    min-inline-size: 0;
+    color: inherit;
+    text-decoration: none;
+}
+
+.nowo-notify-kit-item__link:hover .nowo-notify-kit-item__title {
+    text-decoration: underline;
+}
+
+.nowo-notify-kit-item__title {
+    overflow-wrap: anywhere;
+}
+
+.nowo-notify-kit-item.is-unread .nowo-notify-kit-item__title {
+    font-weight: 600;
+}
+
+.nowo-notify-kit-item__meta {
+    color: var(--nowo-ui-muted, inherit);
+    font-size: 0.8rem;
+}
+
+.nowo-notify-kit-item__toggle {
+    flex: none;
+    inline-size: 1.5rem;
+    block-size: 1.5rem;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.nowo-notify-kit-item__toggle::before {
+    content: "";
+    display: block;
+    inline-size: 0.55rem;
+    block-size: 0.55rem;
+    margin: auto;
+    border: 2px solid var(--nowo-ui-primary, currentColor);
+    border-radius: 999px;
+}
+
+.nowo-notify-kit-item.is-unread .nowo-notify-kit-item__toggle::before {
+    background: var(--nowo-ui-primary, currentColor);
+}
+
+.nowo-notify-kit-item__toggle:focus-visible {
+    outline: 2px solid var(--nowo-ui-focus-ring-color, currentColor);
+    outline-offset: 1px;
+}
+
+.nowo-notify-kit-dot {
+    display: inline-block;
+    inline-size: 0.55rem;
+    block-size: 0.55rem;
+    margin-inline-end: 0.35rem;
+    border-radius: 999px;
+    background: var(--nowo-ui-primary, currentColor);
+}
+
+.nowo-notify-kit-visually-hidden {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nowo-notify-kit-bell[open] > .nowo-notify-kit-bell__panel {
+        animation: none;
+    }
+}

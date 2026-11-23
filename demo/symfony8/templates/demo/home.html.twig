@@ -3,18 +3,31 @@
 {% block nowo_ui_page_header %}
     {{ include(nowo_ui_partial('page_header'), {
         title: 'Notify Kit Bundle',
-        intro: 'Notifications for Symfony: one notify() call, an in-app inbox with a real-time badge, per-person preferences by category and channel, quiet hours and digests, mail / push / Slack channels and GDPR export and erasure.',
+        intro: 'One notify() call, an in-app inbox with a header bell and a realtime badge, deny-by-default access to rows with a context.',
     }) }}
 {% endblock %}
 
 {% block body %}
-    {% embed '@NowoUiKit/demo_platform/_section.html.twig' with {title: 'Bundle status', intro: 'The package is built slice by slice from its design contract. S0 ships the bundle class and its strict configuration tree; the features arrive with the next slices (see docs/ROADMAP.md).', kind: 'table'} %}
+    {% if app.user %}
+        {% embed '@NowoUiKit/demo_platform/_section.html.twig' with {title: 'Send a notification', intro: 'The bell in the top bar counts your unread rows; open it, mark rows read, or go to the inbox page. The badge follows changes made in other tabs every 10 seconds (realtime: ' ~ realtime ~ ').', kind: 'form'} %}
+            {% block section_body %}
+                <div data-testid="demo-notify">{{ form(notify) }}</div>
+            {% endblock %}
+        {% endembed %}
+    {% else %}
+        {% embed '@NowoUiKit/demo_platform/_section.html.twig' with {title: 'Sign in', intro: 'Two demo people: Alice may open project "demo" and the operator page; Bob may not.', kind: 'form'} %}
+            {% block section_body %}
+                <div data-testid="demo-sign-in">{{ form(sign_in) }}</div>
+            {% endblock %}
+        {% endembed %}
+    {% endif %}
+    {% embed '@NowoUiKit/demo_platform/_section.html.twig' with {title: 'Bundle status', intro: 'Built slice by slice from its design contract (docs/ROADMAP.md).', kind: 'table'} %}
         {% block section_body %}
             <table class="nowo-ui-data-table" data-testid="demo-status">
                 <tbody>
-                    <tr><th scope="row">Bundle</th><td class="nowo-ui-cell--wrap"><code class="nowo-ui-code">Nowo\NotifyKitBundle\NowoNotifyKitBundle</code> registered, <code class="nowo-ui-code">nowo_notify_kit.enabled</code> = <strong>{{ enabled ? 'true' : 'false' }}</strong></td></tr>
-                    <tr><th scope="row">API prefix parameter</th><td class="nowo-ui-cell--wrap"><code class="nowo-ui-code">%nowo_notify_kit.api_prefix%</code> = <code class="nowo-ui-code">{{ api_prefix }}</code></td></tr>
-                    <tr><th scope="row">Table prefix</th><td><code class="nowo-ui-code">{{ table_prefix }}</code></td></tr>
+                    <tr><th scope="row">Bundle</th><td class="nowo-ui-cell--wrap"><code class="nowo-ui-code">Nowo\NotifyKitBundle\NowoNotifyKitBundle</code>, inbox at <code class="nowo-ui-code">/notifications</code>, operator page at <code class="nowo-ui-code">/admin/notifications</code></td></tr>
+                    <tr><th scope="row">Signed in</th><td>{{ app.user ? app.user.userIdentifier : 'nobody' }}</td></tr>
+                    <tr><th scope="row">Realtime badge</th><td>{{ realtime }}</td></tr>
                     <tr><th scope="row">Database</th><td>{{ database is null ? 'not reachable' : 'MySQL ' ~ database }}</td></tr>
                     <tr><th scope="row">FrankenPHP</th><td>{{ worker ? 'worker mode (kernel kept alive)' : 'classic mode' }}</td></tr>
                 </tbody>
