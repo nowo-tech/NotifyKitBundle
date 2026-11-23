@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MIN_POLL_SECONDS, NotifyKitBell, OPEN_WAIT_MS, UPDATED_EVENT, attachAll } from '../src/bell';
+import { MAX_STREAM_ERRORS, MIN_POLL_SECONDS, NotifyKitBell, OPEN_WAIT_MS, UPDATED_EVENT, attachAll } from '../src/bell';
 
 const ID_A = '019a0000-0000-7000-8000-00000000000a';
 const ID_B = '019a0000-0000-7000-8000-00000000000b';
@@ -34,13 +34,17 @@ function menuHtml(unread = 2): string {
   </ul></div>`;
 }
 
-function response(body: unknown, init: { status?: number; etag?: string; text?: boolean } = {}): Response {
+function response(body: unknown, init: { status?: number; etag?: string; type?: string; redirected?: boolean } = {}): Response {
   const status = init.status ?? 200;
-  const headers = new Headers(init.etag ? { ETag: init.etag } : {});
+  const headers = new Headers({ 'Content-Type': init.type ?? (typeof body === 'string' ? 'text/html; charset=UTF-8' : 'application/json') });
+  if (init.etag) {
+    headers.set('ETag', init.etag);
+  }
 
   return {
     ok: status >= 200 && status < 300,
     status,
+    redirected: init.redirected ?? false,
     headers,
     json: () => Promise.resolve(body),
     text: () => Promise.resolve(String(body)),
@@ -115,7 +119,7 @@ describe('NotifyKitBell', () => {
     root.dispatchEvent(new Event('toggle'));
     expect(root.querySelector('.nowo-notify-kit-menu__loading')!.textContent).toBe('Loading');
     await flush();
-    expect(fetchMock).toHaveBeenCalledWith('/n/menu', expect.objectContaining({ credentials: 'same-origin' }));
+    expect(fetchMock).toHaveBeenCalledWith('/n/menu', expect.objectContaining({ credentials: 'same-origin', redirect: 'error' }));
     expect(root.querySelectorAll('[data-id]')).toHaveLength(2);
     expect(bell.count).toBe(3);
     root.dispatchEvent(new Event('toggle'));
@@ -133,6 +137,39 @@ describe('NotifyKitBell', () => {
     track(bell);
     await bell.load();
     expect(root.querySelector('[data-nowo-notify-kit-panel]')!.textContent).toBe('Could not load');
+  });
+
+  it('refuses a redirected answer, another content type or a fragment without the menu (ZAJ-I6)', async () => {
+    const { bell, root } = mount();
+    track(bell);
+    const panel = root.querySelector('[data-nowo-notify-kit-panel]')!;
+    for (const answer of [
+      response(menuHtml(), { redirected: true }),
+      response(menuHtml(), { type: 'application/json' }),
+      response('<form action="/login"><input name="password"></form>'),
+    ]) {
+      fetchMock.mockResolvedValueOnce(answer);
+      await bell.load();
+      expect(panel.textContent).toBe('Could not load');
+      expect(panel.querySelector('form, [data-id]')).toBeNull();
+    }
+    const headerless = response(menuHtml());
+    headerless.headers.delete('Content-Type');
+    fetchMock.mockResolvedValueOnce(headerless);
+    await bell.load();
+    expect(panel.textContent).toBe('Could not load');
+  });
+
+  it('keeps only the menu element of the fragment', async () => {
+    fetchMock.mockResolvedValueOnce(response(`<p id="around">around</p>${menuHtml(4)}<img id="after" src="x">`));
+    const { bell, root } = mount();
+    track(bell);
+    await bell.load();
+    const panel = root.querySelector('[data-nowo-notify-kit-panel]')!;
+    expect(panel.children).toHaveLength(1);
+    expect(panel.firstElementChild!.hasAttribute('data-nowo-notify-kit-menu')).toBe(true);
+    expect(panel.querySelector('#around, #after')).toBeNull();
+    expect(bell.count).toBe(4);
   });
 
   it('does nothing without a menu URL', async () => {
@@ -277,6 +314,9 @@ describe('NotifyKitBell', () => {
     const sources: Array<{ url: string; init: EventSourceInit | undefined; onmessage: ((event: MessageEvent<string>) => void) | null; close: () => void }> = [];
     class FakeSource {
       onmessage: ((event: MessageEvent<string>) => void) | null = null;
+      onerror: (() => void) | null = null;
+      onopen: (() => void) | null = null;
+      readyState = 1;
       close = vi.fn();
       constructor(public url: string, public init: EventSourceInit | undefined = undefined) {
         sources.push(this);
@@ -294,6 +334,73 @@ describe('NotifyKitBell', () => {
     expect(bell.count).toBe(7);
     bell.destroy();
     expect(sources[0]!.close).toHaveBeenCalled();
+  });
+
+  describe('Mercure stream errors (ZAJ-2)', () => {
+    type Fake = { onmessage: ((event: MessageEvent<string>) => void) | null; onerror: (() => void) | null; onopen: (() => void) | null; readyState: number; close: ReturnType<typeof vi.fn> };
+    let sources: Fake[];
+
+    beforeEach(() => {
+      sources = [];
+      class FakeSource {
+        onmessage: ((event: MessageEvent<string>) => void) | null = null;
+        onerror: (() => void) | null = null;
+        onopen: (() => void) | null = null;
+        readyState = 0;
+        close = vi.fn();
+        constructor() {
+          sources.push(this);
+        }
+      }
+      vi.stubGlobal('EventSource', FakeSource);
+      vi.useFakeTimers();
+    });
+
+    const mercure = (): NotifyKitBell =>
+      track(mount({ 'data-realtime': 'mercure', 'data-hub-url': '/.well-known/mercure', 'data-topic': 'notify-kit/r/abc', 'data-poll-seconds': '30' }).bell);
+
+    it('keeps the stream through transient errors and falls back to polling after repeated ones', async () => {
+      const bell = mercure();
+      const source = sources[0]!;
+      for (let i = 1; i < MAX_STREAM_ERRORS; i++) {
+        source.onerror!();
+      }
+      source.onopen!();
+      for (let i = 1; i < MAX_STREAM_ERRORS; i++) {
+        source.onerror!();
+      }
+      source.onmessage!({ data: '{"event":"notify.updated","unread":1}' } as MessageEvent<string>);
+      for (let i = 1; i < MAX_STREAM_ERRORS; i++) {
+        source.onerror!();
+      }
+      expect(source.close).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      fetchMock.mockResolvedValue(response({ unread: 6 }, { etag: '"u6"' }));
+      source.onerror!();
+      expect(source.close).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(fetchMock).toHaveBeenCalledWith('/n/count', expect.anything());
+      expect(bell.count).toBe(6);
+      await vi.advanceTimersByTimeAsync(30_000 + 5);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+
+      source.onerror!();
+      expect(source.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back at once when the hub closed the stream', async () => {
+      const bell = mercure();
+      fetchMock.mockResolvedValue(response({ unread: 2 }, { etag: '"u2"' }));
+      sources[0]!.readyState = 2;
+      sources[0]!.onerror!();
+      expect(sources[0]!.close).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      bell.destroy();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('polls the count with its ETag and pauses while the tab is hidden', async () => {

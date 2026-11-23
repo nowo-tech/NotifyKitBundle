@@ -18,6 +18,12 @@ export const OPEN_WAIT_MS = 1500;
 /** Shortest poll interval. */
 export const MIN_POLL_SECONDS = 10;
 
+/**
+ * Consecutive Mercure stream errors (no message or open in between) after which the bell gives up the stream and polls
+ * instead: an expired or replaced subscriber cookie, or a hub answering 401, makes the browser retry forever.
+ */
+export const MAX_STREAM_ERRORS = 3;
+
 type JsonAnswer = { ok?: boolean; unreadCount?: number; unread?: number | boolean };
 
 const bound = new WeakMap<HTMLElement, NotifyKitBell>();
@@ -37,6 +43,7 @@ export class NotifyKitBell {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private lastPoll = 0;
   private source: EventSource | null = null;
+  private streamErrors = 0;
   private readonly cleanups: Array<() => void> = [];
 
   /** Binds $element once and returns its bell. */
@@ -113,9 +120,11 @@ export class NotifyKitBell {
     if (!this.loaded) {
       panel.replaceChildren(this.message('loadingLabel', 'nowo-notify-kit-menu__loading'));
     }
-    this.loading = fetch(url, { credentials: 'same-origin', headers: { Accept: 'text/html' } })
+    // No redirects (an expired session would answer with the login page) and HTML only; then only the menu element of
+    // the fragment is kept, anything around it is dropped.
+    this.loading = fetch(url, { credentials: 'same-origin', redirect: 'error', headers: { Accept: 'text/html' } })
       .then((response) => {
-        if (!response.ok) {
+        if (!response.ok || response.redirected || !(response.headers.get('Content-Type') ?? '').startsWith('text/html')) {
           throw new Error(String(response.status));
         }
 
@@ -124,11 +133,14 @@ export class NotifyKitBell {
       .then((html) => {
         const template = document.createElement('template');
         template.innerHTML = html;
-        panel.replaceChildren(template.content);
+        const menu = template.content.querySelector<HTMLElement>('[data-nowo-notify-kit-menu]');
+        if (!menu) {
+          throw new Error('menu');
+        }
+        panel.replaceChildren(menu);
         this.loaded = true;
         this.stale = false;
-        const menu = panel.querySelector<HTMLElement>('[data-nowo-notify-kit-menu]');
-        if (menu?.dataset.unread !== undefined) {
+        if (menu.dataset.unread !== undefined) {
           this.setCount(Number.parseInt(menu.dataset.unread, 10) || 0);
         }
       })
@@ -285,7 +297,12 @@ export class NotifyKitBell {
       const url = new URL(hub, window.location.href);
       url.searchParams.append('topic', topic);
       this.source = new EventSource(url.toString(), { withCredentials: true });
+      this.source.onopen = () => {
+        this.streamErrors = 0;
+      };
+      this.source.onerror = () => this.onStreamError();
       this.source.onmessage = (message: MessageEvent<string>) => {
+        this.streamErrors = 0;
         try {
           const data = JSON.parse(message.data) as { event?: string; unread?: unknown };
           if (data.event === 'notify.updated') {
@@ -299,9 +316,32 @@ export class NotifyKitBell {
       return;
     }
     if (mode === 'poll') {
-      this.listen(document, 'visibilitychange', () => this.onVisibility());
-      this.schedule();
+      this.startPolling();
     }
+  }
+
+  /**
+   * The stream failed. A closed stream (the hub refused it) or {@see MAX_STREAM_ERRORS} errors in a row: close it, poll
+   * the count at once to re-sync, then keep polling.
+   */
+  private onStreamError(): void {
+    const source = this.source;
+    if (!source) {
+      return;
+    }
+    this.streamErrors++;
+    if (source.readyState !== 2 /* EventSource.CLOSED */ && this.streamErrors < MAX_STREAM_ERRORS) {
+      return;
+    }
+    source.close();
+    this.source = null;
+    this.startPolling();
+    void this.poll();
+  }
+
+  private startPolling(): void {
+    this.listen(document, 'visibilitychange', () => this.onVisibility());
+    this.schedule();
   }
 
   private interval(): number {
