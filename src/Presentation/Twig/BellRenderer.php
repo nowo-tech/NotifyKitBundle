@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Nowo\NotifyKitBundle\Presentation\Twig;
 
+use Nowo\NotifyKitBundle\Application\Realtime\RealtimeSubscriptionInterface;
 use Nowo\NotifyKitBundle\Contract\InboxInterface;
 use Nowo\NotifyKitBundle\Contract\RealtimePublisherInterface;
 use Nowo\NotifyKitBundle\Contract\RecipientRef;
 use Nowo\NotifyKitBundle\Contract\Security\InboxAccessCheckerInterface;
-use Nowo\NotifyKitBundle\Infrastructure\Realtime\MercureSubscription;
 use Nowo\NotifyKitBundle\Presentation\Controller\InboxController;
 use Nowo\NotifyKitBundle\Presentation\Http\CurrentRecipient;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
@@ -39,7 +39,7 @@ final readonly class BellRenderer implements RuntimeExtensionInterface
         private UrlGeneratorInterface $router,
         private CsrfTokenManagerInterface $csrf,
         private ?RealtimePublisherInterface $publisher = null,
-        private ?MercureSubscription $mercure = null,
+        private ?RealtimeSubscriptionInterface $mercure = null,
         private string $realtime = 'poll',
         private int $pollSeconds = 60,
         private ?string $template = null,

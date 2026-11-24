@@ -6,13 +6,13 @@ namespace Nowo\NotifyKitBundle\Application;
 
 use DateTimeImmutable;
 use DateTimeZone;
+use Nowo\NotifyKitBundle\Application\Default\RandomNotificationIdGenerator;
 use Nowo\NotifyKitBundle\Application\Preferences\Preferences;
 use Nowo\NotifyKitBundle\Application\Realtime\UnreadBadge;
 use Nowo\NotifyKitBundle\Contract\ContextRef;
 use Nowo\NotifyKitBundle\Contract\Event\NotificationRecordedEvent;
 use Nowo\NotifyKitBundle\Contract\Event\NotificationSkippedEvent;
 use Nowo\NotifyKitBundle\Contract\Exception\InvalidNotificationArgumentException;
-use Nowo\NotifyKitBundle\Contract\NotificationId;
 use Nowo\NotifyKitBundle\Contract\NotificationRequest;
 use Nowo\NotifyKitBundle\Contract\NotifierInterface;
 use Nowo\NotifyKitBundle\Contract\NotifyResult;
@@ -22,13 +22,13 @@ use Nowo\NotifyKitBundle\Contract\SkipReason;
 use Nowo\NotifyKitBundle\Contract\TypeDefinition;
 use Nowo\NotifyKitBundle\Contract\TypeRegistryInterface;
 use Nowo\NotifyKitBundle\Domain\Notification;
+use Nowo\NotifyKitBundle\Domain\NotificationIdGeneratorInterface;
 use Nowo\NotifyKitBundle\Domain\NotificationStoreInterface;
 use Nowo\NotifyKitBundle\Domain\RecordOutcome;
 use Psr\Clock\ClockInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use Symfony\Component\Uid\Uuid;
 
 use function count;
 use function hash;
@@ -61,6 +61,7 @@ final readonly class Notifier implements NotifierInterface
     /**
      * @param int $repeatWindowSeconds `inbox.repeat_window_seconds` (0 = never coalesce)
      * @param int $maxRecipients `fan_out.max_recipients`
+     * @param NotificationIdGeneratorInterface|null $ids id of new rows (the container wires the symfony/uid UUIDv7 generator; null: {@see RandomNotificationIdGenerator})
      */
     public function __construct(
         private NotificationStoreInterface $store,
@@ -74,6 +75,7 @@ final readonly class Notifier implements NotifierInterface
         private ?LoggerInterface $logger = null,
         private ?UnreadBadge $badge = null,
         private ?Preferences $preferences = null,
+        private ?NotificationIdGeneratorInterface $ids = null,
     ) {
     }
 
@@ -223,7 +225,7 @@ final readonly class Notifier implements NotifierInterface
     private function draft(NotificationRequest $request, TypeDefinition $type, RecipientRef $recipient, DateTimeImmutable $now): Notification
     {
         return new Notification(
-            new NotificationId(Uuid::v7()->toRfc4122()),
+            ($this->ids ?? new RandomNotificationIdGenerator())->next(),
             $recipient,
             $request->type,
             $type->category,

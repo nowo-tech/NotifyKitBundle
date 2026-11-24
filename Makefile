@@ -9,7 +9,7 @@ COMPOSE_BIN := $(shell $(DOCKER_BIN) compose version >/dev/null 2>&1 && echo "$(
 COMPOSE     := $(COMPOSE_BIN) -f $(COMPOSE_FILE)
 SERVICE_PHP := php
 
-.PHONY: help up down down-dev build shell install ensure-up test test-ts test-coverage test-coverage-100 coverage-check validate-phpdoc coverage-php-percent cs-check cs-fix qa clean release-check release-check-demos demo-smoke composer-sync rector rector-dry phpstan igor update validate assets setup-hooks check-no-cursor-coauthor check-open-prs check-no-raw-html-form check-twig-extra validate-translations test-with-db test-coverage-with-db strip-cursor-coauthor-from-history
+.PHONY: help up down down-dev build shell install ensure-up test test-ts test-coverage test-coverage-100 coverage-check validate-phpdoc coverage-php-percent cs-check cs-fix qa clean release-check release-check-demos demo-smoke composer-sync rector rector-dry phpstan deptrac igor update validate assets setup-hooks check-no-cursor-coauthor check-open-prs check-no-raw-html-form check-twig-extra validate-translations test-with-db test-coverage-with-db strip-cursor-coauthor-from-history
 
 help:
 	@echo "Notify Kit Bundle - Development Commands"
@@ -35,9 +35,10 @@ help:
 	@echo "  rector-dry    Run Rector in dry-run mode"
 	@echo "  phpstan       Run PHPStan static analysis"
 	@echo "  igor          Run Igor worker-state audit (REQ-CS-008)"
+	@echo "  deptrac       Check the layer dependencies of src/ (REQ-ARCH-002)"
 	@echo "  validate-phpdoc Fail when a class or public method in src/ has no PHPDoc (REQ-CS-001)"
 	@echo "  qa            Run all QA checks (cs-check + test)"
-	@echo "  release-check Pre-release: ensure-up, co-author/open-PR/raw-form checks, composer-sync, cs-fix, cs-check, rector-dry, phpstan, validate-phpdoc, igor, validate-translations, test-coverage + 100% gate, demos"
+	@echo "  release-check Pre-release: ensure-up, co-author/open-PR/raw-form checks, composer-sync, cs-fix, cs-check, rector-dry, phpstan, deptrac, validate-phpdoc, igor, validate-translations, test-coverage + 100% gate, demos"
 	@echo "  check-no-raw-html-form No raw <form>/<input>/<textarea>/<select> in bundle or demo Twig (REQ-TWIG-005)"
 	@echo "  check-twig-extra       twig/extra-bundle in the package and every Twig demo (REQ-TWIG-004)"
 	@echo "  validate-translations  YAML syntax + key parity of the 7 locales (REQ-MAKE-004 / REQ-I18N-002)"
@@ -118,6 +119,10 @@ rector-dry: ensure-up
 phpstan: ensure-up
 	$(COMPOSE) exec -T $(SERVICE_PHP) composer phpstan
 
+# REQ-ARCH-002: layer dependencies of src/ (deptrac.yaml); fails on violations, uncovered and unassigned classes.
+deptrac: ensure-up
+	$(COMPOSE) exec -T $(SERVICE_PHP) composer deptrac
+
 qa: ensure-up
 	$(COMPOSE) exec $(SERVICE_PHP) composer qa
 
@@ -143,6 +148,7 @@ release-check:
 	@$(MAKE) cs-check
 	@$(MAKE) rector-dry
 	@$(MAKE) phpstan
+	@$(MAKE) deptrac
 	@$(MAKE) validate-phpdoc
 	@$(MAKE) igor
 	@$(MAKE) validate-translations

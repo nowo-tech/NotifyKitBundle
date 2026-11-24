@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\NotifyKitBundle;
 
+use Nowo\NotifyKitBundle\Contract\TranslationDomain;
 use Nowo\NotifyKitBundle\DependencyInjection\Compiler\AfterCommitMiddlewarePass;
 use Nowo\NotifyKitBundle\DependencyInjection\Compiler\AuditKitBridgePass;
 use Nowo\NotifyKitBundle\DependencyInjection\Compiler\RealtimePass;
@@ -32,7 +33,7 @@ use Symfony\Component\HttpKernel\Bundle\Bundle;
 final class NowoNotifyKitBundle extends Bundle
 {
     /** Translation domain of the bundle UI copy (REQ-I18N-003) and Twig namespace (REQ-TWIG-002). */
-    public const TRANSLATION_DOMAIN = 'NowoNotifyKitBundle';
+    public const TRANSLATION_DOMAIN = TranslationDomain::NAME;
 
     /**
      * Adds the compiler passes: DoctrineBundle required, the after-commit middleware on the bundle connection only,

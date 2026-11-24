@@ -1,0 +1,126 @@
+# REQ-ARCH-002: layer dependencies of src/ checked by Deptrac (strict ruleset, no skipped violations).
+# Run: composer deptrac / make deptrac. Layers follow REQ-ARCH-001; docs/ARCHITECTURE.md explains them.
+deptrac:
+  paths:
+    - ./src
+  exclude_files:
+    - '#.*/src/Resources/.*#'
+  layers:
+    # --- Bundle layers -------------------------------------------------------------------------------------------
+    # Domain: the public contract (ports, VOs, events, exceptions in src/Contract) and the domain model (src/Domain).
+    - name: Domain
+      collectors:
+        - type: classLike
+          value: '^Nowo\\NotifyKitBundle\\(Contract|Domain)\\'
+    - name: Application
+      collectors:
+        - type: classLike
+          value: '^Nowo\\NotifyKitBundle\\Application\\'
+    # Infrastructure: Doctrine, DBAL, Messenger, Mercure, console and schema adapters.
+    - name: Infrastructure
+      collectors:
+        - type: classLike
+          value: '^Nowo\\NotifyKitBundle\\Infrastructure\\'
+    # DependencyInjection: the composition root (bundle class, extension, compiler passes). It wires every layer.
+    - name: DependencyInjection
+      collectors:
+        - type: classLike
+          value: '^Nowo\\NotifyKitBundle\\(DependencyInjection\\|NowoNotifyKitBundle$)'
+    - name: Bridge
+      collectors:
+        - type: classLike
+          value: '^Nowo\\NotifyKitBundle\\Bridge\\'
+    - name: UI
+      collectors:
+        - type: classLike
+          value: '^Nowo\\NotifyKitBundle\\Presentation\\'
+    # --- Vendor layers -------------------------------------------------------------------------------------------
+    # Framework-free contract packages, listed by name (Domain and Application may use them).
+    - name: Psr
+      collectors:
+        - type: classLike
+          value: '^Psr\\(Clock|Log|EventDispatcher)\\'
+    - name: TransactionContract
+      collectors:
+        - type: classLike
+          value: '^Nowo\\TransactionContract\\'
+    - name: SymfonyContracts
+      collectors:
+        - type: classLike
+          value: '^Symfony\\Contracts\\'
+    - name: Symfony
+      collectors:
+        - type: classLike
+          value: '^Symfony\\(Component|Bundle|Bridge)\\'
+    - name: Doctrine
+      collectors:
+        - type: classLike
+          value: '^Doctrine\\'
+    - name: Twig
+      collectors:
+        - type: classLike
+          value: '^Twig\\'
+    - name: NowoBundles
+      collectors:
+        - type: classLike
+          value: '^Nowo\\(UiKitBundle|FormKitBundle|TransactionDoctrine)\\'
+    - name: AuditKit
+      collectors:
+        - type: classLike
+          value: '^Nowo\\AuditKitBundle\\'
+    - name: Igor
+      collectors:
+        - type: classLike
+          value: '^IgorPhp\\'
+  ruleset:
+    Domain:
+      - Psr
+      - TransactionContract
+    Application:
+      - Domain
+      - Psr
+      - TransactionContract
+    Infrastructure:
+      - Domain
+      - Application
+      - Psr
+      - TransactionContract
+      - SymfonyContracts
+      - Symfony
+      - Doctrine
+      - Twig
+      - NowoBundles
+      - Igor
+    DependencyInjection:
+      - Domain
+      - Application
+      - Infrastructure
+      - Bridge
+      - UI
+      - Psr
+      - TransactionContract
+      - SymfonyContracts
+      - Symfony
+      - Doctrine
+      - Twig
+      - NowoBundles
+      - AuditKit
+      - Igor
+    Bridge:
+      - Domain
+      - Application
+      - Psr
+      - TransactionContract
+      - SymfonyContracts
+      - Symfony
+      - AuditKit
+    UI:
+      - Domain
+      - Application
+      - Psr
+      - TransactionContract
+      - SymfonyContracts
+      - Symfony
+      - Twig
+      - NowoBundles
+  skip_violations: {}
