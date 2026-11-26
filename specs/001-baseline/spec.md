@@ -62,6 +62,9 @@ and `nowo_notify_kit.config` exist.
 | FR-WORKER-001 | One kernel kept alive serves N requests with no bleed between owners and flat memory. |
 | FR-DB-001 | Identifier columns compare exactly on SQLite, MySQL (`utf8mb4_bin`) and PostgreSQL. |
 | FR-I18N-001 | Seven translation catalogues with the same keys (en, es, it, fr, pt, de, nl). |
+| FR-ID-001 | Notification ids come from `Domain\NotificationIdGeneratorInterface`: the container wires the monotonic `Infrastructure\Identity\UuidV7NotificationIdGenerator`; a `Notifier` built by hand falls back to `Application\Default\RandomNotificationIdGenerator` (plain-PHP UUIDv7, not ordered inside one millisecond). |
+| FR-ASSET-001 | Each shipped browser script (bell, preferences) prints one `📦 [notify-kit/…] script loaded` console line per page (REQ-ASSETS-005, `logger.ts`) unless `<html data-nowo-console="quiet">` or `globalThis.NOWO_CONSOLE === 'quiet'`; every other console output stays behind the debug flag. |
+| FR-QA-001 | The TypeScript sources keep co-located Vitest suites under `src/Resources/assets/tests/` (bell, preferences, peers, IIFE entries, logger); they ship no runtime code and are mapped in the inventory like any other file of `src/`. |
 
 ## Success criteria
 
@@ -69,8 +72,8 @@ and `nowo_notify_kit.config` exist.
 
 ## Non-goals (baseline)
 
-- No HTML pages, bell, preferences UI or HTTP API yet: they land with the later slices of [`docs/ROADMAP.md`](../../docs/ROADMAP.md).
-- No mail / push / Slack delivery in S1 (channel bridges are later slices); no message bodies are stored, only type keys,
+- Baseline = S0 plus the shared rows above. The bell, inbox and operator pages, realtime and access (S2) and the preferences matrix with its AuditKit bridge (S3) are specified in [`../003-s2-access-ui/spec.md`](../003-s2-access-ui/spec.md) and [`../004-s3-preferences/spec.md`](../004-s3-preferences/spec.md); later slices follow [`docs/ROADMAP.md`](../../docs/ROADMAP.md).
+- No mail / push / Slack delivery up to S3 (channel bridges are later slices); no message bodies are stored, only type keys,
   targets and short params.
 - The bundle never flushes the application's EntityManager (DBAL only, FR-TX-001).
 
