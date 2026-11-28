@@ -10,7 +10,7 @@
 
 ## Requirements
 
-- PHP 8.2 to 8.5 (Symfony 8.x needs PHP 8.4+).
+- PHP 8.2 to 8.6 (Symfony 8.x needs PHP 8.4+).
 - Symfony 7.4, 8.0 or 8.1 (CI covers 7.4 and 8.1).
 - Doctrine DBAL 3.9+ or 4, Doctrine ORM 3.3+ (mapping only) and DoctrineBundle; MySQL 8 / MariaDB 10.6+, PostgreSQL 13+
   or SQLite.

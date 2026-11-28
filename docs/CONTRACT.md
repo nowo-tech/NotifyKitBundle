@@ -98,7 +98,7 @@ composer (Q-O10).
 | Composer | **`nowo-tech/notify-kit-bundle`** |
 | GitHub | `nowo-tech/NotifyKitBundle`, public, MIT; the owner creates it and registers it on Packagist after S0 is on `main` |
 | Namespace / class | `Nowo\NotifyKitBundle` / `NowoNotifyKitBundle`; config root `nowo_notify_kit`; Twig namespace and translation domain `NowoNotifyKitBundle`; Stimulus identifier prefix `nowo-notify-kit--` |
-| PHP / Symfony | `>=8.2 <8.6`; `^7.4 \|\| ^8.0`; demo Symfony 8.1 + FrankenPHP worker + MySQL + Mercure (REQ-DEMO-010/011/012) |
+| PHP / Symfony | `>=8.2 <8.7`; `^7.4 \|\| ^8.0`; demo Symfony 8.1 + FrankenPHP worker + MySQL + Mercure (REQ-DEMO-010/011/012) |
 | Runtime deps | `symfony/{http-foundation,http-kernel,routing,config,dependency-injection,event-dispatcher,security-core,translation,uid,clock,rate-limiter}`, `doctrine/dbal ^3.9 \|\| ^4`, `doctrine/orm ^3.3` (mapping only), `psr/log`, `nowo-tech/ui-kit-bundle`, `nowo-tech/form-kit-bundle`, `twig/twig` |
 | Suggest | `symfony/messenger` (async fan-out), `symfony/mercure-bundle` (realtime), `symfony/mailer` + `nowo-tech/mail-kit-bundle` (mail channel, branding), `nowo-tech/pwa-bundle` (push), `nowo-tech/slack-kit-bundle` (Slack DM), `nowo-tech/user-kit-bundle` (erasure, export, account status), `nowo-tech/chat-kit-bundle` (support bridge), `nowo-tech/api-token-bundle` (expiry bridge, public API auth), `nowo-tech/audit-kit-bundle`, `nowo-tech/brand-contracts` (mail and push branding) |
 | First tag | 1.0.0 after S6, the REQ audit (`bundle-req-audit`, 100 %) and the SEC-004 audit |

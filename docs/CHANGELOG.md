@@ -29,6 +29,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   the translation domain from `Contract\TranslationDomain::NAME` (`NowoNotifyKitBundle::TRANSLATION_DOMAIN`
   keeps the same value).
 
+### Changed
+
+- PHP 8.6 and Symfony 8.2 support in CI (both stable, no allowed failures): `composer.json` allows PHP below 8.7 (was below 8.6) and `.github/workflows/forward-compat.yml` runs PHP 8.6 / Symfony 8.1 and PHP 8.5 / Symfony 8.2 cells.
+
 ## [0.4.0] - 2026-11-23
 
 ### Added
