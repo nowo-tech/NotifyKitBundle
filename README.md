@@ -54,7 +54,7 @@ See [docs/INSTALLATION.md](docs/INSTALLATION.md). Nothing is registered while `n
 
 ## Requirements
 
-- PHP >= 8.2, < 8.6
+- PHP >= 8.2, < 8.7
 - Symfony 7.4, 8.0 or 8.1
 
 ## Configuration
